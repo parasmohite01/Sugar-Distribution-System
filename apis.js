@@ -1,34 +1,4 @@
-/* ===================================================================
-   apis.js - the ONLY file that talks to Firebase.
-   1. Paste your Firebase web config below (Project settings > Your apps).
-   2. Enable Authentication > Email/Password and create Firestore.
-   3. Create the admin: Authentication > Add user  admin@sugar-system.app
-      then in Firestore add  users/<that user's UID>  =
-      { role: "admin", name: "Admin", username: "admin", active: true }
-   4. Paste these rules in Firestore > Rules (the pages' checks are only
-      for convenience; THESE rules are what actually protect the data):
 
-   rules_version = '2';
-   service cloud.firestore { match /databases/{d}/documents {
-     function live(){ return request.auth != null &&
-       exists(/databases/$(d)/documents/users/$(request.auth.uid)); }
-     function admin(){ return live() &&
-       get(/databases/$(d)/documents/users/$(request.auth.uid)).data.role == 'admin'; }
-     function mine(){ return live() && resource.data.uid == request.auth.uid; }
-     match /users/{u} { allow read: if request.auth.uid == u || admin(); allow write: if admin(); }
-     match /shareholders/{s} { allow read: if admin() || mine(); allow write: if admin(); }
-     match /records/{r}  { allow read: if admin() || mine(); allow write: if admin(); }
-     match /festival/{r} { allow read: if admin() || mine(); allow write: if admin(); }
-     match /payments/{p} {
-       allow read: if admin() || mine();
-       allow create: if live() && request.resource.data.uid == request.auth.uid
-                        && request.resource.data.status == 'pending';
-       allow update: if admin();
-     }
-     match /settings/payment { allow read: if live(); allow write: if admin(); }
-     match /settings/stock   { allow read, write: if admin(); }
-   }}
-   =================================================================== */
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -36,10 +6,10 @@ import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, qu
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyC0Vpi3jDeQViRie-y8LbUU8MAxAsNsjfg",
+  authDomain: "sugar-distribution-syste-c2ef3.firebaseapp.com",
+  projectId: "sugar-distribution-syste-c2ef3",
+  appId: "1:217317887183:web:27902b9d85894608d4fbba"
 };
 
 const app = initializeApp(firebaseConfig), auth = getAuth(app), db = getFirestore(app);
