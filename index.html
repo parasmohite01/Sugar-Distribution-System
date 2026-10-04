@@ -29,6 +29,12 @@ button:disabled{opacity:.6;cursor:wait}
 <script type="module">
 import { login } from "./apis.js";
 const $ = id => document.getElementById(id);
+  const why = new URLSearchParams(location.search).get("e");
+if (why) $("err").textContent = ({
+  session: "The browser did not keep your login. Allow site data for this site, avoid private or in-app browsers, or try another browser.",
+  profile: "This account has no active profile. Ask the admin to add you.",
+  role: "This account cannot open that page. Sign in again."
+})[why] || "Could not open the page (" + why + ").";
 $("f").onsubmit = async e => {
   e.preventDefault(); $("err").textContent = ""; $("b").disabled = true;
   try {
