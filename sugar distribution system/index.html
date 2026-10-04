@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sugar Distribution - Login</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
+body{min-height:100vh;display:flex;justify-content:center;align-items:center;background:linear-gradient(135deg,#1e3a8a,#2563eb)}
+.box{width:400px;max-width:90%;background:#fff;padding:35px;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+h1{text-align:center;color:#1e3a8a;margin-bottom:8px}
+p{text-align:center;color:#6b7280;margin-bottom:25px;font-size:14px}
+input,button{width:100%;padding:12px;margin-bottom:15px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}
+button{background:#2563eb;color:#fff;border:0;cursor:pointer}
+button:hover{background:#1d4ed8}
+button:disabled{opacity:.6;cursor:wait}
+#err{color:#dc2626;font-size:13px;margin-bottom:12px;text-align:center;min-height:16px}
+</style>
+</head>
+<body>
+<form class="box" id="f">
+  <h1>Sugar Distribution</h1>
+  <p>Sign in with the username and password the admin gave you</p>
+  <input id="u" placeholder="Username" autocomplete="username" required>
+  <input id="p" type="password" placeholder="Password" autocomplete="current-password" required>
+  <div id="err" role="alert"></div>
+  <button id="b">Sign in</button>
+</form>
+<script type="module">
+import { login } from "./apis.js";
+const $ = id => document.getElementById(id);
+$("f").onsubmit = async e => {
+  e.preventDefault(); $("err").textContent = ""; $("b").disabled = true;
+  try {
+    const me = await login($("u").value, $("p").value);
+    location.replace(me.role === "admin" ? "admin.html" : "shareholder.html");
+  } catch (x) { $("err").textContent = x.message; $("b").disabled = false; }
+};
+</script>
+</body>
+</html>
