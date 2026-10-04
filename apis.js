@@ -36,16 +36,16 @@ export async function login(username, password) {
 export const logout = () => signOut(auth).then(() => location.replace("index.html"));
 
 // Page guard: resolves with the profile only if the signed-in user has this role.
+const bounce = why => location.replace("index.html?e=" + encodeURIComponent(why));
 export const guard = role => new Promise(res => {
   const off = onAuthStateChanged(auth, async u => {
     off();
-    if (!u) return location.replace("index.html");
-    const s = await getDoc(doc(db, "users", u.uid));
-    const d = s.exists() && s.data();
-    if (!d || d.active === false || d.role !== role) {
-      await signOut(auth);
-      return location.replace("index.html");
-    }
+    if (!u) return bounce("session");
+    let d;
+    try { const s = await getDoc(doc(db, "users", u.uid)); d = s.exists() && s.data(); }
+    catch (e) { return bounce("db-" + (e.code || "error")); }
+    if (!d || d.active === false) { await signOut(auth); return bounce("profile"); }
+    if (d.role !== role) { await signOut(auth); return bounce("role"); }
     res({ uid: u.uid, ...d });
   });
 });
