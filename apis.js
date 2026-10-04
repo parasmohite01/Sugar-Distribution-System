@@ -22,7 +22,10 @@ export const esc = s => String(s ?? "").replace(/[&<>"']/g,
 export async function login(username, password) {
   let cred;
   try { cred = await signInWithEmailAndPassword(auth, mail(username), password); }
-  catch { throw new Error("Wrong username or password."); }
+    catch (e) {
+    const bad = ["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-email"];
+    throw new Error(bad.includes(e.code) ? "Wrong username or password." : "Sign-in failed (" + e.code + "). Check firebaseConfig in apis.js.");
+  }
   const s = await getDoc(doc(db, "users", cred.user.uid));
   if (!s.exists() || s.data().active === false) {
     await signOut(auth);
