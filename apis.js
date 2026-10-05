@@ -5,10 +5,10 @@ import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, qu
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyC0Vpi3jDeQViRie-y8LbUU8MAxAsNsjfg",
+  authDomain: "sugar-distribution-syste-c2ef3.firebaseapp.com",
+  projectId: "sugar-distribution-syste-c2ef3",
+  appId: "1:217317887183:web:27902b9d85894608d4fbba"
 };
 
 const app = initializeApp(firebaseConfig), auth = getAuth(app), db = getFirestore(app);
