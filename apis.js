@@ -1,15 +1,14 @@
-
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, writeBatch, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const const firebaseConfig = {
-  apiKey: "AIzaSyC0Vpi3jDeQViRie-y8LbUU8MAxAsNsjfg",
-  authDomain: "sugar-distribution-syste-c2ef3.firebaseapp.com",
-  projectId: "sugar-distribution-syste-c2ef3",
-  appId: "1:217317887183:web:27902b9d85894608d4fbba"
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig), auth = getAuth(app), db = getFirestore(app);
@@ -22,7 +21,7 @@ export const esc = s => String(s ?? "").replace(/[&<>"']/g,
 export async function login(username, password) {
   let cred;
   try { cred = await signInWithEmailAndPassword(auth, mail(username), password); }
-    catch (e) {
+  catch (e) {
     const bad = ["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-email"];
     throw new Error(bad.includes(e.code) ? "Wrong username or password." : "Sign-in failed (" + e.code + "). Check firebaseConfig in apis.js.");
   }
