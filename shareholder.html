@@ -37,6 +37,7 @@ th{background:#f9fafb;color:#374151}
 input{padding:11px;border:1px solid #d1d5db;border-radius:7px;font-size:14px}
 input:focus{outline:0;border-color:#2563eb}
 .btn{padding:11px 16px;border:0;border-radius:7px;cursor:pointer;font-size:14px;background:#2563eb;color:#fff}
+.btn:disabled{opacity:.6;cursor:wait}
 .tag{padding:3px 9px;border-radius:99px;font-size:12px;font-weight:600}
 .pending{background:#fef3c7;color:#92400e}.approved{background:#dcfce7;color:#166534}.rejected{background:#fee2e2;color:#991b1b}
 #qrImg{max-width:280px;width:100%;border:1px solid #e5e7eb;border-radius:10px}
@@ -74,9 +75,17 @@ input:focus{outline:0;border-color:#2563eb}
       <form id="pF" class="grid">
         <div class="fg"><label for="amt">Amount paid (&#8377;)</label><input id="amt" type="number" min="1" step="0.01" required></div>
         <div class="fg"><label for="ref">UPI reference / transaction ID</label><input id="ref" required></div>
-        <div><button class="btn">Submit payment</button></div>
+        <div><button class="btn" id="pBtn">Submit payment</button></div>
       </form></div>
-    <div class="card"><h3>My Payments</h3><div class="wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead><tbody id="pT"></tbody></table></div></div>
+  </section>
+
+  <section id="payrec">
+    <div class="stats">
+      <div class="stat"><h3>Total Submitted</h3><b id="pSub">&#8377;0</b></div>
+      <div class="stat"><h3>Approved</h3><b id="pApp">&#8377;0</b></div>
+      <div class="stat"><h3>Waiting for Admin</h3><b id="pPend">0</b></div>
+    </div>
+    <div class="card"><h3>Payment Records</h3><div class="wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead><tbody id="pT"></tbody></table></div></div>
   </section>
 </main>
 
@@ -89,7 +98,7 @@ let REC = [], FES = [], PAY = [];
 
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().split("T")[0]; };
 
-const TABS = [["dash", "Dashboard"], ["sugar", "My Sugar"], ["pay", "Pay"]];
+const TABS = [["dash", "Dashboard"], ["sugar", "My Sugar"], ["pay", "Payment"], ["payrec", "Payment Records"]];
 $("nav").innerHTML = TABS.map(([id, l]) => `<div class="nav" data-t="${id}">${l}</div>`).join("");
 const show = id => {
   document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === id));
@@ -106,6 +115,7 @@ $("welcome").textContent = "Welcome, " + me.name;
 $("meta").textContent = "ID: " + me.shareholderId + (sh.village ? "  |  Village: " + sh.village : "");
 
 const row = (list, cols) => list.length ? list.map(r => `<tr>${cols(r)}</tr>`).join("") : `<tr><td colspan="4" class="empty">Nothing here yet.</td></tr>`;
+const rs = n => "&#8377;" + Math.round(n * 100) / 100;
 function draw() {
   const t = today();
   // Festival sugar counts only from its date; before that it is listed as "Coming Soon".
@@ -115,14 +125,19 @@ function draw() {
     ...FES.filter(r => r.date <= t).map(r => ({ label: r.festival + " (festival)", qty: Number(r.qty), date: r.date, fest: true }))
   ].sort((a, b) => b.date.localeCompare(a.date));
   const cols = r => `<td>${esc(r.label)}</td><td style="color:${r.qty < 0 ? "#dc2626" : "inherit"}">${r.fest && r.qty > 0 ? "+" : ""}${r.qty} kg</td><td>${esc(r.date)}</td>`;
+  const paid = PAY.filter(p => p.status === "approved").reduce((a, p) => a + Number(p.amount), 0);
 
   $("sTotal").textContent = Math.round(items.reduce((a, r) => a + r.qty, 0) * 100) / 100 + " kg";
   $("sCount").textContent = items.length;
-  $("sPaid").innerHTML = "&#8377;" + PAY.filter(p => p.status === "approved").reduce((a, p) => a + Number(p.amount), 0);
+  $("sPaid").innerHTML = rs(paid);
   $("soonCard").hidden = !soon.length;
   $("soon").innerHTML = soon.map(r => `<tr><td>${esc(r.festival)}</td><td style="color:${r.qty < 0 ? "#dc2626" : "inherit"}">${r.qty > 0 ? "+" : ""}${esc(r.qty)} kg</td><td>${esc(r.date)}</td></tr>`).join("");
   $("recent").innerHTML = row(items.slice(0, 5), cols);
   $("all").innerHTML = row(items, cols);
+
+  $("pSub").innerHTML = rs(PAY.reduce((a, p) => a + Number(p.amount), 0));
+  $("pApp").innerHTML = rs(paid);
+  $("pPend").textContent = PAY.filter(p => p.status === "pending").length;
   const pays = [...PAY].sort((a, b) => (b.createdAt?.seconds || 9e9) - (a.createdAt?.seconds || 9e9));
   $("pT").innerHTML = row(pays, p => `<td>${p.createdAt ? p.createdAt.toDate().toLocaleDateString() : ""}</td><td>&#8377;${esc(p.amount)}</td><td>${esc(p.ref)}</td><td><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td>`);
 }
@@ -140,152 +155,12 @@ A.watchDoc("settings/payment", d => {
 });
 
 $("pF").onsubmit = async e => {
-  e.preventDefault();
+  e.preventDefault(); $("pBtn").disabled = true;
   try {
     await A.submitPayment({ uid: me.uid, shareholderId: me.shareholderId, name: me.name, amount: Number($("amt").value), ref: $("ref").value.trim() });
-    e.target.reset(); alert("Payment submitted. The admin will verify it.");
+    e.target.reset(); alert("Payment submitted. The admin will verify it."); show("payrec");
   } catch (x) { alert(x.message); }
-};
-</script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shareholder - Sugar Distribution</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
-body{background:#f5f7fb;color:#1f2937}
-.side{position:fixed;left:0;top:0;width:240px;height:100vh;background:#111827;color:#fff;padding:20px 15px;z-index:10}
-.logo{font-size:21px;font-weight:bold;padding:10px;margin-bottom:25px}
-.nav{padding:13px 15px;border-radius:8px;margin-bottom:6px;cursor:pointer;color:#d1d5db}
-.nav:hover,.nav.act{background:#2563eb;color:#fff}
-.out{position:absolute;bottom:20px;left:15px;width:calc(100% - 30px);padding:11px;background:#dc2626;color:#fff;border:0;border-radius:8px;cursor:pointer}
-main{margin-left:240px;padding:25px}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
-.top h2{font-size:25px}
-.menu{display:none;background:#111827;color:#fff;border:0;padding:10px 13px;border-radius:7px}
-section{display:none}section.on{display:block}
-.welcome{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;padding:25px;border-radius:12px;margin-bottom:22px}
-.welcome h2{margin-bottom:8px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;margin-bottom:22px}
-.stat,.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
-.card{margin-bottom:22px}
-.stat h3{font-size:14px;color:#6b7280;margin-bottom:10px}
-.stat b{font-size:26px}
-.card h3{font-size:19px;margin-bottom:16px}
-.wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse}
-th,td{padding:12px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:14px}
-th{background:#f9fafb;color:#374151}
-.empty{text-align:center;color:#6b7280;padding:22px}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
-.fg{display:flex;flex-direction:column}
-.fg label{margin-bottom:7px;font-weight:600;font-size:14px}
-input{padding:11px;border:1px solid #d1d5db;border-radius:7px;font-size:14px}
-input:focus{outline:0;border-color:#2563eb}
-.btn{padding:11px 16px;border:0;border-radius:7px;cursor:pointer;font-size:14px;background:#2563eb;color:#fff}
-.tag{padding:3px 9px;border-radius:99px;font-size:12px;font-weight:600}
-.pending{background:#fef3c7;color:#92400e}.approved{background:#dcfce7;color:#166534}.rejected{background:#fee2e2;color:#991b1b}
-#qrImg{max-width:280px;width:100%;border:1px solid #e5e7eb;border-radius:10px}
-@media(max-width:750px){.side{transform:translateX(-100%);transition:.3s}.side.open{transform:none}main{margin-left:0;padding:14px}.menu{display:block}.grid{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<aside class="side" id="side"><div class="logo">Sugar Distribution</div><div id="nav"></div><button class="out" id="logout">Logout</button></aside>
-<main>
-  <div class="top"><button class="menu" id="menu">&#9776;</button><h2 id="title">Dashboard</h2><span id="who">Shareholder</span></div>
-
-  <section id="dash">
-    <div class="welcome"><h2 id="welcome">Welcome</h2><div id="meta"></div></div>
-    <div class="stats">
-      <div class="stat"><h3>Total Sugar Received</h3><b id="sTotal">0 kg</b></div>
-      <div class="stat"><h3>Entries</h3><b id="sCount">0</b></div>
-      <div class="stat"><h3>Payments Approved</h3><b id="sPaid">&#8377;0</b></div>
-    </div>
-    <div class="card"><h3>Recent Sugar</h3><div class="wrap"><table><thead><tr><th>For</th><th>Quantity</th><th>Date</th></tr></thead><tbody id="recent"></tbody></table></div></div>
-  </section>
-
-  <section id="sugar">
-    <div class="card"><h3>My Sugar</h3><div class="wrap"><table><thead><tr><th>For</th><th>Quantity</th><th>Date</th></tr></thead><tbody id="all"></tbody></table></div></div>
-  </section>
-
-  <section id="pay">
-    <div class="card"><h3>Pay with QR</h3>
-      <div id="noQr" class="empty" hidden>The admin has not added a payment QR yet. Check back soon.</div>
-      <div id="qrBox" hidden>
-        <img id="qrImg" alt="Payment QR code">
-        <p id="upiLine" style="margin-top:10px"></p><p id="noteLine" style="color:#6b7280"></p>
-      </div></div>
-    <div class="card"><h3>I have paid</h3>
-      <form id="pF" class="grid">
-        <div class="fg"><label for="amt">Amount paid (&#8377;)</label><input id="amt" type="number" min="1" step="0.01" required></div>
-        <div class="fg"><label for="ref">UPI reference / transaction ID</label><input id="ref" required></div>
-        <div><button class="btn">Submit payment</button></div>
-      </form></div>
-    <div class="card"><h3>My Payments</h3><div class="wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead><tbody id="pT"></tbody></table></div></div>
-  </section>
-</main>
-
-<script type="module">
-import * as A from "./apis.js";
-const $ = id => document.getElementById(id), esc = A.esc;
-const me = await A.guard("shareholder");   // admins and logged-out visitors are sent back to index.html
-const sh = await A.getShareholder(me.shareholderId) || {};
-let REC = [], FES = [], PAY = [];
-
-const TABS = [["dash", "Dashboard"], ["sugar", "My Sugar"], ["pay", "Pay"]];
-$("nav").innerHTML = TABS.map(([id, l]) => `<div class="nav" data-t="${id}">${l}</div>`).join("");
-const show = id => {
-  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === id));
-  document.querySelectorAll(".nav").forEach(n => n.classList.toggle("act", n.dataset.t === id));
-  $("title").textContent = TABS.find(t => t[0] === id)[1]; $("side").classList.remove("open");
-};
-$("nav").onclick = e => e.target.dataset.t && show(e.target.dataset.t);
-$("menu").onclick = () => $("side").classList.toggle("open");
-$("logout").onclick = A.logout;
-show("dash");
-
-$("who").textContent = me.name;
-$("welcome").textContent = "Welcome, " + me.name;
-$("meta").textContent = "ID: " + me.shareholderId + (sh.village ? "  |  Village: " + sh.village : "");
-
-const row = (list, cols) => list.length ? list.map(r => `<tr>${cols(r)}</tr>`).join("") : `<tr><td colspan="4" class="empty">Nothing here yet.</td></tr>`;
-function draw() {
-  const items = [
-    ...REC.map(r => ({ label: r.month, qty: Number(r.quantity), date: r.date })),
-    ...FES.map(r => ({ label: r.festival + " (festival)", qty: Number(r.qty), date: r.date }))
-  ].sort((a, b) => b.date.localeCompare(a.date));
-  const cols = r => `<td>${esc(r.label)}</td><td style="color:${r.qty < 0 ? "#dc2626" : "inherit"}">${r.qty > 0 && !r.label.includes("(festival)") ? "" : r.qty > 0 ? "+" : ""}${r.qty} kg</td><td>${esc(r.date)}</td>`;
-  $("sTotal").textContent = items.reduce((a, r) => a + r.qty, 0) + " kg";
-  $("sCount").textContent = items.length;
-  $("sPaid").innerHTML = "&#8377;" + PAY.filter(p => p.status === "approved").reduce((a, p) => a + Number(p.amount), 0);
-  $("recent").innerHTML = row(items.slice(0, 5), cols);
-  $("all").innerHTML = row(items, cols);
-  const pays = [...PAY].sort((a, b) => (b.createdAt?.seconds || 9e9) - (a.createdAt?.seconds || 9e9));
-  $("pT").innerHTML = row(pays, p => `<td>${p.createdAt ? p.createdAt.toDate().toLocaleDateString() : ""}</td><td>&#8377;${esc(p.amount)}</td><td>${esc(p.ref)}</td><td><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td>`);
-}
-
-// Each query is filtered by this user's uid, matching the Firestore rules.
-A.watch("records", l => { REC = l; draw(); }, me.uid);
-A.watch("festival", l => { FES = l; draw(); }, me.uid);
-A.watch("payments", l => { PAY = l; draw(); }, me.uid);
-A.watchDoc("settings/payment", d => {
-  $("noQr").hidden = !!d?.qrImage; $("qrBox").hidden = !d?.qrImage;
-  if (!d?.qrImage) return;
-  $("qrImg").src = d.qrImage;
-  $("upiLine").textContent = d.upiId ? "UPI ID: " + d.upiId : "";
-  $("noteLine").textContent = d.note || "";
-});
-
-$("pF").onsubmit = async e => {
-  e.preventDefault();
-  try {
-    await A.submitPayment({ uid: me.uid, shareholderId: me.shareholderId, name: me.name, amount: Number($("amt").value), ref: $("ref").value.trim() });
-    e.target.reset(); alert("Payment submitted. The admin will verify it.");
-  } catch (x) { alert(x.message); }
+  $("pBtn").disabled = false;
 };
 </script>
 </body>
