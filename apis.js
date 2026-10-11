@@ -1,7 +1,11 @@
+/* ===================================================================
+   apis.js - the ONLY file that talks to Firebase.
+   >>> PASTE YOUR 4 FIREBASE VALUES BELOW (copy them from your old apis.js) <<<
+   =================================================================== */
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, writeBatch, serverTimestamp }
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, query, where, onSnapshot, writeBatch, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -16,6 +20,12 @@ const mail = u => u.trim().toLowerCase() + "@sugar-system.app";
 
 export const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Month list used by every page: [{ key: "2026-10", label: "October 2026" }, ...]
+export const monthOptions = (from, count) => Array.from({ length: count }, (_, i) => {
+  const n = new Date(), d = new Date(n.getFullYear(), n.getMonth() + from + i, 1);
+  return { key: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"), label: d.toLocaleString("en-US", { month: "long", year: "numeric" }) };
+});
 
 /* ---------- auth ---------- */
 export async function login(username, password) {
@@ -50,14 +60,29 @@ export const guard = role => new Promise(res => {
 });
 
 /* ---------- reads (live) ---------- */
+// A failed read shows a red banner (id="dbErr") instead of failing silently.
+const fail = (what, e) => {
+  console.error(what, e);
+  const b = document.getElementById("dbErr");
+  if (b) { b.hidden = false; b.textContent = "Could not load " + what + " (" + (e.code || e.message) + "). Re-publish the Firestore rules, then refresh."; }
+};
 export const watch = (col, cb, uid) => onSnapshot(
   uid ? query(collection(db, col), where("uid", "==", uid)) : collection(db, col),
-  s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => console.error(col, e));
+  s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => fail(col, e));
 export const watchDoc = (path, cb) => onSnapshot(doc(db, ...path.split("/")),
-  s => cb(s.exists() ? s.data() : null), e => console.error(path, e));
-export const getShareholder = async id => (s => s.exists() ? s.data() : null)(await getDoc(doc(db, "shareholders", id)));
+  s => cb(s.exists() ? s.data() : null), e => fail(path, e));
 
-/* ---------- admin writes ---------- */
+/* ---------- writes ---------- */
+// Firestore allows only 20 rule lookups per batch, so big jobs are saved in small groups.
+const CH = 8;
+const commitAll = async ops => {
+  for (let i = 0; i < ops.length; i += CH) {
+    const b = writeBatch(db);
+    ops.slice(i, i + CH).forEach(f => f(b));
+    await b.commit();
+  }
+};
+
 export async function addShareholder(sh, username, password) {
   const ref = doc(db, "shareholders", sh.id);
   if ((await getDoc(ref)).exists()) throw new Error("Shareholder ID already exists.");
@@ -80,28 +105,60 @@ export const removeShareholder = sh => {
   b.delete(doc(db, "shareholders", sh.id)); b.delete(doc(db, "users", sh.uid));
   return b.commit();
 };
-const addMany = (col, list) => {
-  const b = writeBatch(db);
-  list.forEach(x => b.set(doc(collection(db, col)), { ...x, createdAt: serverTimestamp() }));
-  return b.commit();
-};
-export const addRecords = l => addMany("records", l);
-export const addFestival = l => addMany("festival", l);
-export const removeFestival = ids => {
-  const b = writeBatch(db);
-  ids.forEach(id => b.delete(doc(db, "festival", id)));
-  return b.commit();
-};
-// Yearly profile update: details, season, sugarcane supplied, monthly sugar quota.
 export const updateShareholder = (sh, data) => {
   const b = writeBatch(db);
   b.update(doc(db, "shareholders", sh.id), data);
   if (data.name) b.update(doc(db, "users", sh.uid), { name: data.name });
   return b.commit();
 };
-export const setStock = total => setDoc(doc(db, "settings", "stock"), { total });
-export const savePayment = data => setDoc(doc(db, "settings", "payment"), { ...data, updatedAt: serverTimestamp() });
-export const setPaymentStatus = (id, status) => updateDoc(doc(db, "payments", id), { status });
+// Factory list: hits = Map(shareholderId -> cane tons). Everyone else is taken off the shortlist.
+export const applyShortlist = (season, hits, allIds) => commitAll(allIds.map(id => b =>
+  b.update(doc(db, "shareholders", id), hits.has(id)
+    ? { shortlisted: true, season, caneTons: hits.get(id) }
+    : { shortlisted: false, season, caneTons: 0 })));
 
-/* ---------- shareholder writes ---------- */
+// Monthly sugar: one record per shareholder per month (the id makes duplicates impossible).
+export const addRecords = list => commitAll(list.map(r => b =>
+  b.set(doc(db, "records", encodeURIComponent(r.shareholderId) + "_" + r.monthKey), { ...r, createdAt: serverTimestamp() })));
+export const addFestival = list => commitAll(list.map(x => b =>
+  b.set(doc(collection(db, "festival")), { ...x, createdAt: serverTimestamp() })));
+export const removeFestival = ids => commitAll(ids.map(id => b => b.delete(doc(db, "festival", id))));
+
+export const setStock = total => setDoc(doc(db, "settings", "stock"), { total });
+export const setSugar = monthlyKg => setDoc(doc(db, "settings", "sugar"), { monthlyKg: Number(monthlyKg), updatedAt: serverTimestamp() });
+export const savePayment = data => setDoc(doc(db, "settings", "payment"), { ...data, updatedAt: serverTimestamp() });
+
+/* ---------- payments and bills ---------- */
 export const submitPayment = p => setDoc(doc(collection(db, "payments")), { ...p, status: "pending", createdAt: serverTimestamp() });
+export const addCashPayment = p => setDoc(doc(collection(db, "payments")), { ...p, status: "approved", createdAt: serverTimestamp() });
+export const setPaymentStatus = (id, status) => updateDoc(doc(db, "payments", id), { status });
+export const generateBill = (id, billNo, kg) => updateDoc(doc(db, "payments", id), { billNo, kg, billAt: serverTimestamp() });
+
+// Printable bill shown over the page (Print button also lets you Save as PDF).
+export function showBill(p, info = {}) {
+  document.getElementById("billModal")?.remove();
+  const when = (p.billAt?.toDate ? p.billAt.toDate() : new Date()).toLocaleDateString("en-IN");
+  const row = (a, b) => `<tr><td>${a}</td><td>${esc(b)}</td></tr>`;
+  const m = document.createElement("div");
+  m.id = "billModal";
+  m.innerHTML = `<style>
+#billModal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99;overflow:auto;padding:20px;font-family:Arial,Helvetica,sans-serif}
+#billModal .sheet{background:#fff;color:#111;max-width:560px;margin:0 auto;padding:28px;border-radius:10px}
+#billModal h2{text-align:center;margin-bottom:4px}
+#billModal .sub{text-align:center;color:#555;margin-bottom:18px}
+#billModal .meta{display:flex;justify-content:space-between;margin-bottom:14px;font-size:14px}
+#billModal table{width:100%;border-collapse:collapse}
+#billModal td{padding:9px 6px;border-bottom:1px solid #ddd;font-size:14px}
+#billModal td:first-child{color:#555;width:42%}
+#billModal .paid{margin:18px 0;text-align:center;font-weight:bold;font-size:18px;color:#166534;border:2px solid #166534;padding:8px;border-radius:8px}
+#billModal .acts{display:flex;gap:10px;justify-content:center;margin-top:16px}
+#billModal button{padding:10px 16px;border:0;border-radius:7px;background:#2563eb;color:#fff;cursor:pointer}
+#billModal button.g{background:#6b7280}
+@media print{body>*:not(#billModal){display:none!important}#billModal{position:static;background:none;padding:0}#billModal .acts{display:none}}
+</style><div class="sheet"><h2>${esc(info.org || "Sugar Distribution")}</h2><div class="sub">Payment Bill</div>
+<div class="meta"><span>Bill No: <b>${esc(p.billNo || "-")}</b></span><span>Date: ${when}</span></div>
+<table>${row("Shareholder", p.name)}${row("Shareholder ID", p.shareholderId)}${info.village ? row("Village", info.village) : ""}${info.mobile ? row("Mobile", info.mobile) : ""}${row("Sugar for", p.month)}${p.kg ? row("Sugar quantity", p.kg + " kg") : ""}${row("Payment method", p.method === "cash" ? "Cash" : "Online (UPI)")}${p.method === "cash" ? "" : row("Reference", p.ref)}${row("Amount paid", "₹" + p.amount)}</table>
+<div class="paid">PAID</div>
+<div class="acts"><button onclick="window.print()">Print / Save as PDF</button><button class="g" onclick="document.getElementById('billModal').remove()">Close</button></div></div>`;
+  document.body.appendChild(m);
+}
