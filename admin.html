@@ -15,9 +15,11 @@ body{background:#f5f7fb;color:#1f2937}
 .nav:hover,.nav.act{background:#2563eb;color:#fff}
 .out{position:absolute;bottom:20px;left:15px;width:calc(100% - 30px);padding:11px;background:#dc2626;color:#fff;border:0;border-radius:8px;cursor:pointer}
 main{margin-left:240px;padding:25px}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:25px}
 .top h2{font-size:25px}
 .menu{display:none;background:#111827;color:#fff;border:0;padding:10px 13px;border-radius:7px}
+.conn{font-size:13px;padding:5px 11px;border-radius:99px;font-weight:600}
+.conn.ok{background:#dcfce7;color:#166534}.conn.bad{background:#fee2e2;color:#991b1b}
 .alert{background:#fee2e2;color:#991b1b;padding:12px 15px;border-radius:8px;margin-bottom:18px;font-size:14px}
 section{display:none}section.on{display:block}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:18px;margin-bottom:22px}
@@ -33,20 +35,24 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:14p
 th{background:#f9fafb;color:#374151}
 .empty{text-align:center;color:#6b7280;padding:22px}
 .btn{padding:10px 15px;border:0;border-radius:7px;cursor:pointer;font-size:14px;background:#2563eb;color:#fff}
-.btn.red{background:#dc2626}.btn.green{background:#16a34a}.btn.gray{background:#6b7280}.btn.sm{padding:6px 10px;font-size:13px}
+.btn.red{background:#dc2626}.btn.green{background:#16a34a}.btn.gray{background:#6b7280}.btn.sm{padding:6px 10px;font-size:13px;margin:2px 0}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
 .fg{display:flex;flex-direction:column}
 .fg label{margin-bottom:7px;font-weight:600;font-size:14px}
 input,select{padding:11px;border:1px solid #d1d5db;border-radius:7px;font-size:14px}
 input:focus,select:focus{outline:0;border-color:#2563eb}
 input[readonly]{background:#f3f4f6}
-td input[type=checkbox],th input[type=checkbox],.pick input{width:18px;height:18px;padding:0}
+input[type=checkbox],input[type=radio],.pick input{width:18px;height:18px;padding:0}
 .full{grid-column:1/-1}
 .hint{font-size:13px;color:#6b7280;margin:6px 0 12px}
+.info{background:#eff6ff;color:#1e3a8a;padding:12px 14px;border-radius:8px;margin:14px 0;font-size:14px}
 .pick{max-height:210px;overflow-y:auto;border:1px solid #d1d5db;border-radius:7px;padding:6px 10px}
 .pick label{display:flex;align-items:center;gap:10px;padding:7px 2px;font-size:14px;cursor:pointer}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin:10px 0}
+.chip{display:flex;align-items:center;gap:8px;border:1px solid #d1d5db;border-radius:8px;padding:9px 11px;font-size:14px;background:#f9fafb;cursor:pointer}
+.opt{display:flex;gap:22px;margin:14px 0}.opt label{display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer}
 .tag{padding:3px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
-.pending{background:#fef3c7;color:#92400e}.approved{background:#dcfce7;color:#166534}.rejected{background:#fee2e2;color:#991b1b}
+.pending,.unpaid{background:#fef3c7;color:#92400e}.approved,.paid{background:#dcfce7;color:#166534}.rejected,.cancelled{background:#fee2e2;color:#991b1b}
 #qrPreview{max-width:220px;width:100%;border:1px solid #e5e7eb;border-radius:10px;margin-top:12px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;overflow:auto;padding:20px}
 .msheet{background:#fff;border-radius:12px;padding:22px;max-width:760px;margin:0 auto}
@@ -56,7 +62,7 @@ td input[type=checkbox],th input[type=checkbox],.pick input{width:18px;height:18
 <body>
 <aside class="side" id="side"><div class="logo">Sugar Admin</div><div id="nav"></div><button class="out" id="logout">Logout</button></aside>
 <main>
-  <div class="top"><button class="menu" id="menu">&#9776;</button><h2 id="title">Dashboard</h2><span>Admin</span></div>
+  <div class="top"><button class="menu" id="menu">&#9776;</button><h2 id="title">Dashboard</h2><span class="conn" id="conn" hidden></span></div>
   <div id="dbErr" class="alert" hidden></div>
 
   <section id="dash">
@@ -64,10 +70,11 @@ td input[type=checkbox],th input[type=checkbox],.pick input{width:18px;height:18
       <div class="stat"><h3>Total Shareholders</h3><b id="sSh">0</b></div>
       <div class="stat"><h3>Shortlisted</h3><b id="sList">0</b></div>
       <div class="stat"><h3>Total Stock</h3><b id="sStock">0 kg</b></div>
-      <div class="stat"><h3>Total Distributed</h3><b id="sDist">0 kg</b></div>
+      <div class="stat"><h3>Sugar Given (paid)</h3><b id="sDist">0 kg</b></div>
+      <div class="stat"><h3>Billed, Not Paid Yet</h3><b id="sRes">0 kg</b></div>
       <div class="stat"><h3>Remaining Stock</h3><b id="sRem">0 kg</b></div>
+      <div class="stat"><h3>Bills to Collect</h3><b id="sUnpaid">0</b></div>
       <div class="stat"><h3>Festivals Scheduled</h3><b id="sFest">0</b></div>
-      <div class="stat"><h3>Payments to Confirm</h3><b id="sPay">0</b></div>
     </div>
     <div class="card"><h3>Update Total Stock</h3>
       <form id="stockF" class="grid"><div class="fg"><label for="stk">Total stock (kg)</label><input id="stk" type="number" min="0" required></div>
@@ -91,71 +98,67 @@ td input[type=checkbox],th input[type=checkbox],.pick input{width:18px;height:18
 
   <section id="upd">
     <div class="card"><h3>Factory Cane List (Excel)</h3>
-      <p class="hint">Upload the factory's list of shareholders who supplied sugarcane (.xlsx, .xls or .csv). It needs a <b>Shareholder ID</b> or <b>Name</b> column and, if you have it, a <b>Cane (tons)</b> column. Only people on the list are shortlisted for sugar; everyone else is taken off the shortlist.</p>
+      <p class="hint">Upload the factory's list (.xlsx, .xls or .csv). Columns: <b>Shareholder ID</b> (or Name), <b>Cane (tons)</b>, <b>Total sugar (kg)</b> for the season and <b>Monthly sugar (kg)</b>. Only people on the list are shortlisted for sugar. You can still edit any person by hand below.</p>
       <div class="grid">
         <div class="fg"><label for="lSeason">Season</label><input id="lSeason" placeholder="e.g. 2026-27"></div>
-        <div class="fg"><label for="lFile">Excel / CSV file</label><input id="lFile" type="file" accept=".xlsx,.xls,.csv"></div>
+        <div class="fg"><label for="lMonths">Months in season</label><input id="lMonths" type="number" min="1" value="6"><span class="hint">Only used if the file has Total or Monthly sugar but not both.</span></div>
+        <div class="fg full"><label for="lFile">Excel / CSV file</label><input id="lFile" type="file" accept=".xlsx,.xls,.csv"></div>
       </div>
       <p style="margin-top:12px"><button type="button" class="btn gray sm" id="lTpl">Download template with all shareholders</button></p>
       <div id="lPrev" hidden>
-        <p class="hint" id="lSum" style="margin-top:14px"></p>
-        <div class="wrap"><table><thead><tr><th>Row</th><th>ID in file</th><th>Name in file</th><th>Cane (tons)</th><th>Matches</th><th>Result</th></tr></thead><tbody id="lT"></tbody></table></div>
-        <p style="margin-top:14px"><button type="button" class="btn green" id="lApply">Apply list and shortlist these shareholders</button></p>
+        <p class="hint" id="lCols" style="margin-top:14px"></p>
+        <p class="hint" id="lSum"></p>
+        <div class="wrap"><table><thead><tr><th>Row</th><th>ID in file</th><th>Name in file</th><th>Cane (tons)</th><th>Total (kg)</th><th>Monthly (kg)</th><th>Matches</th><th>Result</th></tr></thead><tbody id="lT"></tbody></table></div>
+        <p style="margin-top:14px"><button type="button" class="btn green" id="lApply">Apply list to Firestore</button></p>
       </div></div>
-    <div class="card"><h3>Edit Shareholder Details</h3>
-      <p class="hint" id="uHint">Choose Edit on a shareholder below to change their name, mobile or village.</p>
+    <div class="card"><h3>Edit Shareholder by Hand</h3>
+      <p class="hint" id="uHint">Choose Edit on a shareholder below. Use this when a person's shares are different from the list.</p>
       <form id="uF" class="grid" hidden>
         <div class="fg"><label>Shareholder ID</label><input id="uId" readonly></div>
         <div class="fg"><label>Name</label><input id="uName" required></div>
         <div class="fg"><label>Mobile Number</label><input id="uMob" required></div>
         <div class="fg"><label>Village</label><input id="uVil" required></div>
-        <div class="full"><button class="btn">Save changes</button> <button type="button" class="btn gray" id="uCancel">Cancel</button></div>
+        <div class="fg"><label>Season</label><input id="uSeason" placeholder="e.g. 2026-27"></div>
+        <div class="fg"><label>Cane supplied (tons)</label><input id="uCane" type="number" min="0" step="0.01"></div>
+        <div class="fg"><label>Total sugar for season (kg)</label><input id="uTotal" type="number" min="0" step="0.01"></div>
+        <div class="fg"><label>Monthly sugar (kg)</label><input id="uMonthly" type="number" min="0" step="0.01"></div>
+        <div class="fg"><label>Shortlisted</label><select id="uShort"><option value="yes">Yes</option><option value="no">No</option></select></div>
+        <div class="full"><button class="btn">Save to Firestore</button> <button type="button" class="btn gray" id="uCancel">Cancel</button></div>
       </form></div>
     <div class="card"><div class="head"><h3>Shareholders</h3><input id="uSearch" placeholder="Search shareholder..."></div>
-      <div class="wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Mobile</th><th>Village</th><th>Season</th><th>Cane (tons)</th><th>Shortlisted</th><th></th></tr></thead><tbody id="uT"></tbody></table></div></div>
-  </section>
-
-  <section id="bill">
-    <div class="card"><h3>Payment Options and Bill Details</h3>
-      <form id="bF" class="grid">
-        <div class="fg"><label for="bOrg">Name shown on bills</label><input id="bOrg" placeholder="e.g. Shree Sugar Society"></div>
-        <div class="fg"><label for="bPrice">Price per kg (&#8377;) - optional</label><input id="bPrice" type="number" min="0" step="0.01"></div>
-        <div class="fg"><label for="bUpi">UPI ID for online payment</label><input id="bUpi" placeholder="name@bank"></div>
-        <div class="fg"><label for="bFile">QR code photo (optional)</label><input id="bFile" type="file" accept="image/*"></div>
-        <div class="fg full"><label for="bNote">Note for shareholders (optional)</label><input id="bNote" placeholder="e.g. Pay before the 10th"></div>
-        <div class="full"><button class="btn">Save</button><br><img id="qrPreview" alt="Current payment QR" hidden></div>
-      </form>
-      <p class="hint">If you set a price per kg, every payment is fixed at (monthly kg x price) so nobody can enter a different amount.</p></div>
-    <div class="card"><h3>Record a Cash Payment</h3>
-      <form id="cF" class="grid">
-        <div class="fg"><label for="cWho">Shareholder</label><select id="cWho" required></select></div>
-        <div class="fg"><label for="cMonth">Sugar for month</label><select id="cMonth"></select></div>
-        <div class="fg"><label for="cAmt">Amount received (&#8377;)</label><input id="cAmt" type="number" min="1" step="0.01"><span class="hint" id="cHint"></span></div>
-        <div class="fg" style="justify-content:flex-end"><button class="btn">Record cash payment</button></div>
-      </form></div>
-    <div class="card"><div class="head"><h3>Payments and Bills</h3><input id="pSearch" placeholder="Search payments..."></div>
-      <div class="wrap"><table><thead><tr><th>Date</th><th>Shareholder</th><th>Month</th><th>Method</th><th>Amount</th><th>Reference</th><th>Status</th><th></th></tr></thead><tbody id="pT"></tbody></table></div></div>
+      <div class="wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Village</th><th>Season</th><th>Cane (tons)</th><th>Total (kg)</th><th>Monthly (kg)</th><th>Shortlisted</th><th></th></tr></thead><tbody id="uT"></tbody></table></div></div>
+    <div class="card"><h3>Changes Log</h3><p class="hint">Every list upload and manual edit is recorded here and cannot be changed.</p>
+      <div class="wrap"><table><thead><tr><th>When</th><th>What changed</th></tr></thead><tbody id="cT"></tbody></table></div></div>
   </section>
 
   <section id="alloc">
-    <div class="card"><h3>Sugar per Shareholder (one value for everyone)</h3>
-      <form id="kgF" class="grid">
-        <div class="fg"><label for="kgIn">Monthly sugar for each shareholder (kg)</label><input id="kgIn" type="number" min="0.1" step="0.1" required></div>
-        <div class="fg" style="justify-content:flex-end"><button class="btn">Save</button></div>
-      </form>
-      <p class="hint">Every allocation uses exactly this amount, and it cannot be edited for one person. Saved sugar records cannot be changed or deleted by the admin.</p></div>
-    <div class="card"><h3>Monthly Sugar Allocation</h3>
+    <div class="card"><h3>Allocate Sugar and Generate Bill</h3>
       <form id="aF">
-        <div class="grid">
-          <div class="fg"><label for="aMonth">Month</label><select id="aMonth"></select></div>
-          <div class="fg"><label for="aDate">Distribution date</label><input type="date" id="aDate" required></div>
-        </div>
-        <p class="hint">Only shortlisted shareholders with a confirmed payment for this month are Ready. Untick a Ready name to skip them.</p>
-        <div class="wrap"><table><thead><tr><th><input type="checkbox" id="aAll" title="Select all"></th><th>ID</th><th>Name</th><th>Village</th><th>Sugar</th><th>Payment</th><th>Status</th></tr></thead><tbody id="aT"></tbody></table></div>
-        <div class="head" style="margin:16px 0 0"><b id="aSum"></b><button class="btn">Give sugar to selected</button></div>
+        <div class="fg"><label for="aWho">Shortlisted shareholder</label><select id="aWho"></select></div>
+        <div class="info" id="aInfo"></div>
+        <label style="font-weight:600;font-size:14px">Months to give sugar for (you can tick more than one)</label>
+        <div class="chips" id="aMonths"></div>
+        <div class="head" style="margin:14px 0 0"><b id="aSum"></b><button class="btn">Generate bill</button></div>
       </form></div>
+    <div class="card"><h3>Sugar Left for Each Shareholder</h3>
+      <div class="wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Total</th><th>Paid</th><th>Billed, not paid</th><th>Remaining</th><th>Months left</th><th></th></tr></thead><tbody id="sT"></tbody></table></div></div>
     <div class="card"><h3>Distribution History and Remaining Stock</h3>
       <div class="wrap"><table><thead><tr><th>Date</th><th>For</th><th>Shareholders</th><th>Sugar given</th><th>Stock left after</th></tr></thead><tbody id="hT"></tbody></table></div></div>
+  </section>
+
+  <section id="bill">
+    <div class="card"><h3>Payment Details (admin only)</h3>
+      <form id="bF" class="grid">
+        <div class="fg"><label for="bOrg">Name shown on bills</label><input id="bOrg" placeholder="e.g. Shree Sugar Society"></div>
+        <div class="fg"><label for="bPrice">Price per kg (&#8377;)</label><input id="bPrice" type="number" min="0" step="0.01" required></div>
+        <div class="fg"><label for="bUpi">UPI ID</label><input id="bUpi" placeholder="name@bank"></div>
+        <div class="fg"><label for="bFile">QR code photo</label><input id="bFile" type="file" accept="image/*"></div>
+        <div class="fg full"><label for="bNote">Note shown with the QR (optional)</label><input id="bNote" placeholder="e.g. Pay before collecting sugar"></div>
+        <div class="full"><button class="btn">Save</button><br><img id="qrPreview" alt="Current payment QR" hidden></div>
+      </form>
+      <p class="hint">Bills use this price. The QR is only shown by you, using Show QR on a bill. Shareholders never see it.</p></div>
+    <div class="card"><div class="head"><h3>Bills</h3><input id="pSearch" placeholder="Search bills..."></div>
+      <div class="wrap"><table><thead><tr><th>Date</th><th>Bill No</th><th>Shareholder</th><th>Months</th><th>Sugar</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody id="pT"></tbody></table></div></div>
   </section>
 
   <section id="fest">
@@ -187,32 +190,51 @@ td input[type=checkbox],th input[type=checkbox],.pick input{width:18px;height:18
   <div id="hBody"></div>
 </div></div>
 
+<div class="modal" id="payModal" hidden><div class="msheet" style="max-width:420px">
+  <h3 id="pmTitle" style="margin-bottom:6px"></h3>
+  <p class="hint" id="pmSub"></p>
+  <div class="opt"><label><input type="radio" name="mm" id="mOnline" checked> Online (QR / UPI)</label><label><input type="radio" name="mm" id="mCash"> Cash</label></div>
+  <div class="fg"><label for="mRef">UPI transaction ID (optional)</label><input id="mRef"></div>
+  <p style="margin-top:16px"><button class="btn green" id="mOk">Mark as paid</button> <button class="btn gray" id="mNo">Close</button></p>
+</div></div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module">
 import * as A from "./apis.js";
 const $ = id => document.getElementById(id), esc = A.esc;
 await A.guard("admin");
 
-let SH = [], REC = [], FES = [], PAY = [], SUGAR = null, PS = null, stock = 8500, LIST = [];
-const skip = new Set(), fOff = new Set();      // unticked shareholders (allocation / festival)
-const TABS = [["dash", "Dashboard"], ["sh", "Shareholders"], ["upd", "Update Users"], ["bill", "Billing"], ["alloc", "Sugar Allocation"], ["fest", "Festival Sugar"], ["rec", "Records"]];
+let SH = [], REC = [], FES = [], BILLS = [], LOG = [], PS = null, stock = 8500, LIST = [], COL = {}, payTarget = null;
+const skipF = new Set(), mSel = new Set();
+const TABS = [["dash", "Dashboard"], ["sh", "Shareholders"], ["upd", "Update Users"], ["alloc", "Sugar Allocation"], ["bill", "Billing"], ["fest", "Festival Sugar"], ["rec", "Records"]];
 const MON = A.monthOptions(-2, 12);
 
-const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().split("T")[0]; };
+const ymd = d => new Date(d - d.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+const today = () => ymd(new Date());
 const due = r => r.date <= today();
 const r2 = n => Math.round(n * 100) / 100;
-const sum = (l, k) => r2(l.reduce((a, x) => a + Number(x[k]), 0));
-const net = id => r2(sum(REC.filter(r => r.shareholderId === id), "quantity") + sum(FES.filter(r => r.shareholderId === id && due(r)), "qty"));
-const given = () => r2(sum(REC, "quantity") + sum(FES.filter(due), "qty"));
-const left = () => r2(stock - given());
-const kgEach = () => Number(SUGAR?.monthlyKg) || 0;
-const dueAmt = () => (Number(PS?.pricePerKg) || 0) * kgEach() ? r2(Number(PS.pricePerKg) * kgEach()) : 0;
+const sum = (l, f) => r2(l.reduce((a, x) => a + Number(f(x) || 0), 0));
+const stamp = b => (b.paidAt || b.createdAt)?.toDate ? ymd((b.paidAt || b.createdAt).toDate()) : today();
+const live = b => b.status !== "cancelled";
+const billsOf = id => BILLS.filter(b => b.shareholderId === id);
+const kgPaid = s => sum(billsOf(s.id).filter(b => b.status === "paid" && b.season === s.season), b => b.kg);
+const kgUnpaid = s => sum(billsOf(s.id).filter(b => b.status === "unpaid" && b.season === s.season), b => b.kg);
+const remain = s => r2((Number(s.allotKg) || 0) - kgPaid(s) - kgUnpaid(s));
+const net = id => r2(sum(billsOf(id).filter(b => b.status === "paid"), b => b.kg) + sum(REC.filter(r => r.shareholderId === id), r => r.quantity) + sum(FES.filter(r => r.shareholderId === id && due(r)), r => r.qty));
+const given = () => r2(sum(BILLS.filter(b => b.status === "paid"), b => b.kg) + sum(REC, r => r.quantity) + sum(FES.filter(due), r => r.qty));
+const reserved = () => sum(BILLS.filter(b => b.status === "unpaid"), b => b.kg);
+const left = () => r2(stock - given() - reserved());
 const name = id => (SH.find(s => s.id === id) || {}).name || id;
+const FS = () => SH.filter(s => s.shortlisted);
 const signed = (q, plus) => (plus && q > 0 ? "+" : "") + q + " kg";
 const tb = (id, list, fn, n) => $(id).innerHTML = list.length ? list.map(fn).join("") : `<tr><td colspan="${n}" class="empty">Nothing here yet.</td></tr>`;
 const safe = fn => async e => { e.preventDefault(); try { await fn(e); } catch (x) { alert(x.message); } };
 const newest = (a, b) => (b.createdAt?.seconds || 9e9) - (a.createdAt?.seconds || 9e9);
 const shortTag = s => `<span class="tag ${s.shortlisted ? "approved" : "rejected"}">${s.shortlisted ? "Yes" : "No"}</span>`;
+const nextBill = () => {
+  const n = Math.max(0, ...BILLS.map(b => parseInt(String(b.billNo || "").split("-").pop(), 10) || 0));
+  return "SB-" + new Date().getFullYear() + "-" + String(n + 1).padStart(4, "0");
+};
 
 /* navigation */
 $("nav").innerHTML = TABS.map(([id, l]) => `<div class="nav" data-t="${id}">${l}</div>`).join("");
@@ -225,47 +247,55 @@ $("nav").onclick = e => e.target.dataset.t && show(e.target.dataset.t);
 $("menu").onclick = () => $("side").classList.toggle("open");
 $("logout").onclick = A.logout;
 show("dash");
-
-["aMonth", "cMonth"].forEach(i => $(i).innerHTML = MON.map(m => `<option>${m.label}</option>`).join(""));
-$("aMonth").value = MON[2].label; $("cMonth").value = MON[2].label;
-const resetDates = () => ["aDate", "fDate"].forEach(i => $(i).value = today());
-resetDates();
+$("fDate").value = today();
 
 /* ---------- factory list (Excel) ---------- */
 const norm = v => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 const keyOf = k => String(k).toLowerCase().replace(/[^a-z0-9]/g, "");
-function parseList(rows, shs) {
+function parseList(rows, shs, months) {
   const byId = new Map(shs.map(s => [norm(s.id), s])), byName = new Map();
   shs.forEach(s => { const k = norm(s.name); byName.set(k, [...(byName.get(k) || []), s]); });
-  return rows.map((r, i) => {
-    const k = {}; Object.entries(r).forEach(([a, b]) => k[keyOf(a)] = b);
-    const pick = names => { for (const n of names) if (k[n] !== undefined && String(k[n]).trim() !== "") return String(k[n]).trim(); return ""; };
-    const id = pick(["shareholderid", "shid", "id", "memberid", "memberno", "shareholderno"]);
-    const nm = pick(["name", "shareholdername", "membername", "farmername"]);
-    const tk = Object.keys(k).find(x => /cane|ton/.test(x));
-    const tons = tk ? r2(Number(k[tk]) || 0) : 0;
+  const heads = Object.keys(rows[0] || {}), find = t => heads.find(h => t(keyOf(h)));
+  const col = {
+    id: find(k => ["shareholderid", "shid", "id", "memberid", "memberno", "shareholderno", "shareholder"].includes(k)),
+    nm: find(k => ["name", "shareholdername", "membername", "farmername"].includes(k)),
+    cane: find(k => /cane|ton/.test(k)),
+    monthly: find(k => /month/.test(k)),
+    total: find(k => !/month/.test(k) && (/total|allot|annual/.test(k) || ["sugar", "sugarkg", "kg", "shares", "share"].includes(k)))
+  };
+  const text = (r, h) => h && r[h] !== undefined ? String(r[h]).trim() : "";
+  const num = (r, h) => h ? r2(Number(text(r, h).replace(/,/g, "")) || 0) : 0;
+  const out = rows.map((r, i) => {
+    const id = text(r, col.id), nm = text(r, col.nm), tons = num(r, col.cane);
+    let monthly = num(r, col.monthly), total = num(r, col.total);
+    if (!monthly && total && months) monthly = r2(total / months);
+    if (!total && monthly && months) total = r2(monthly * months);
     let sh = id ? byId.get(norm(id)) : null, note = "";
     if (!sh && nm) { const c = byName.get(norm(nm)) || []; if (c.length === 1) sh = c[0]; else if (c.length > 1) note = "Name matches several shareholders"; }
     if (!sh && !note) note = "Not found";
-    return { row: i + 2, id, nm, tons, sh, note };
-  }).filter(r => r.id || r.nm || r.tons);
+    return { row: i + 2, id, nm, tons, total, monthly, sh, note };
+  }).filter(r => r.id || r.nm || r.tons || r.total || r.monthly);
+  return { rows: out, col };
 }
 function drawList() {
   const seen = new Set(), ok = LIST.filter(r => r.sh);
   $("lPrev").hidden = !LIST.length;
+  $("lCols").textContent = "Columns read from your file - ID: " + (COL.id || "none") + " | Name: " + (COL.nm || "none") + " | Cane: " + (COL.cane || "none") + " | Total sugar: " + (COL.total || "none") + " | Monthly sugar: " + (COL.monthly || "none");
   $("lSum").textContent = ok.length + " matched, " + (LIST.length - ok.length) + " not matched (not matched rows are ignored).";
   tb("lT", LIST, r => {
     const dup = r.sh && seen.has(r.sh.id); if (r.sh) seen.add(r.sh.id);
-    return `<tr><td>${r.row}</td><td>${esc(r.id)}</td><td>${esc(r.nm)}</td><td>${r.tons}</td><td>${r.sh ? esc(r.sh.id) + " - " + esc(r.sh.name) : "-"}</td><td><span class="tag ${r.sh ? "approved" : "rejected"}">${r.sh ? (dup ? "Duplicate (tons added up)" : "Matched") : esc(r.note)}</span></td></tr>`;
-  }, 6);
+    const noKg = r.sh && !r.total && !r.monthly;
+    return `<tr><td>${r.row}</td><td>${esc(r.id)}</td><td>${esc(r.nm)}</td><td>${r.tons}</td><td>${r.total}</td><td>${r.monthly}</td><td>${r.sh ? esc(r.sh.id) + " - " + esc(r.sh.name) : "-"}</td><td><span class="tag ${!r.sh ? "rejected" : noKg || dup ? "pending" : "approved"}">${!r.sh ? esc(r.note) : dup ? "Duplicate (added up)" : noKg ? "Matched, no sugar kg in file" : "Matched"}</span></td></tr>`;
+  }, 8);
 }
 $("lFile").onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   try {
     if (typeof XLSX === "undefined") throw Error("The Excel reader could not load. Check the internet connection and refresh.");
     const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
-    LIST = parseList(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" }), SH);
-    if (!LIST.length) throw Error("No rows found. The first row must be headings such as Shareholder ID and Cane (tons).");
+    const p = parseList(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" }), SH, Number($("lMonths").value) || 0);
+    LIST = p.rows; COL = p.col;
+    if (!LIST.length) throw Error("No rows found. The first row must be headings such as Shareholder ID and Total sugar (kg).");
     drawList();
   } catch (x) { LIST = []; $("lPrev").hidden = true; alert(x.message); }
 };
@@ -273,48 +303,63 @@ $("lApply").onclick = async () => {
   try {
     const season = $("lSeason").value.trim();
     if (!season) throw Error("Enter the season first, for example 2026-27.");
-    const tons = new Map(); LIST.filter(r => r.sh).forEach(r => tons.set(r.sh.id, r2((tons.get(r.sh.id) || 0) + r.tons)));
-    if (!tons.size) throw Error("Nobody in the file matches a shareholder.");
-    if (!confirm("Shortlist " + tons.size + " shareholder(s) for " + season + "? The other " + (SH.length - tons.size) + " will be taken off the shortlist.")) return;
-    await A.applyShortlist(season, tons, SH.map(s => s.id));
-    LIST = []; $("lPrev").hidden = true; $("lFile").value = ""; alert("Shortlist saved for " + season + ".");
+    const hits = new Map();
+    LIST.filter(r => r.sh).forEach(r => {
+      const o = hits.get(r.sh.id) || { tons: 0, total: 0, monthly: 0 };
+      hits.set(r.sh.id, { tons: r2(o.tons + r.tons), total: r2(o.total + r.total), monthly: r2(o.monthly + r.monthly) });
+    });
+    if (!hits.size) throw Error("Nobody in the file matches a shareholder.");
+    if (!confirm("Save this list to Firestore? " + hits.size + " shareholder(s) will be shortlisted for " + season + " and the other " + (SH.length - hits.size) + " will be taken off the shortlist. Their cane and sugar values are replaced by the file.")) return;
+    await A.applyShortlist(season, hits, SH.map(s => s.id));
+    LIST = []; $("lPrev").hidden = true; $("lFile").value = "";
+    alert("Saved to Firestore. " + hits.size + " shareholder(s) shortlisted for " + season + ".");
   } catch (x) { alert(x.message); }
 };
 $("lTpl").onclick = () => {
   const q = v => '"' + String(v).replace(/"/g, '""') + '"';
-  const csv = "Shareholder ID,Name,Cane (tons)\n" + SH.map(s => [q(s.id), q(s.name), ""].join(",")).join("\n");
+  const csv = "Shareholder ID,Name,Cane (tons),Total sugar (kg),Monthly sugar (kg)\n" + SH.map(s => [q(s.id), q(s.name), "", "", ""].join(",")).join("\n");
   const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "cane-list-template.csv" });
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 
-/* ---------- allocation ---------- */
-const payOf = (id, m) => PAY.find(p => p.shareholderId === id && p.month === m && p.status !== "rejected");
-const statusOf = (s, m) => {
-  if (REC.some(r => r.shareholderId === s.id && r.month === m)) return "given";
-  if (!s.shortlisted) return "notlisted";
-  const p = payOf(s.id, m);
-  return !p ? "unpaid" : p.status === "approved" ? "ready" : "pending";
-};
-const LABEL = { given: ["Given", "approved"], notlisted: ["Not shortlisted", "rejected"], unpaid: ["Payment not received", "rejected"], pending: ["Payment not confirmed yet", "pending"], ready: ["Ready", "approved"] };
-const picked = () => SH.filter(s => statusOf(s, $("aMonth").value) === "ready" && !skip.has(s.id));
-function drawAlloc() {
-  const m = $("aMonth").value, kg = kgEach(), ready = SH.filter(s => statusOf(s, m) === "ready");
-  $("aT").innerHTML = SH.length ? SH.map(s => {
-    const k = statusOf(s, m), p = payOf(s.id, m);
-    return `<tr><td><input type="checkbox" data-on="${esc(s.id)}" ${k === "ready" && !skip.has(s.id) ? "checked" : ""} ${k === "ready" ? "" : "disabled"}></td><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.village)}</td><td>${kg} kg</td><td>${!p ? "Not paid" : p.status === "approved" ? "Paid" : "Pending"}</td><td><span class="tag ${LABEL[k][1]}">${LABEL[k][0]}</span></td></tr>`;
-  }).join("") : `<tr><td colspan="7" class="empty">Add a shareholder first.</td></tr>`;
-  $("aAll").checked = ready.length > 0 && ready.every(s => !skip.has(s.id));
-  const n = picked().length, tot = r2(n * kg);
-  $("aSum").textContent = n + " shareholder(s) x " + kg + " kg = " + tot + " kg  |  stock left " + left() + " kg, " + r2(left() - tot) + " kg after";
+/* ---------- allocation and bills ---------- */
+function drawAllocForm() {
+  const s = SH.find(x => x.id === $("aWho").value);
+  if (!s) { $("aInfo").textContent = "No shortlisted shareholder to allocate to. Upload the factory list in Update Users first."; $("aMonths").innerHTML = ""; $("aSum").textContent = ""; return; }
+  const m = Number(s.monthlyKg) || 0, rate = Number(PS?.pricePerKg) || 0;
+  $("aInfo").innerHTML = `Season ${esc(s.season || "-")} &nbsp;|&nbsp; Total ${s.allotKg || 0} kg &nbsp;|&nbsp; Paid ${kgPaid(s)} kg &nbsp;|&nbsp; Billed, not paid ${kgUnpaid(s)} kg &nbsp;|&nbsp; <b>Remaining ${remain(s)} kg</b> &nbsp;|&nbsp; Monthly ${m} kg`;
+  const taken = new Map(); billsOf(s.id).filter(live).forEach(b => (b.months || []).forEach(x => taken.set(x, b.status)));
+  $("aMonths").innerHTML = MON.map(mo => { const t = taken.get(mo.label);
+    return `<label class="chip"><input type="checkbox" data-mo="${esc(mo.label)}" ${mSel.has(mo.label) && !t ? "checked" : ""} ${t ? "disabled" : ""}>${esc(mo.label)}${t ? " (" + (t === "paid" ? "paid" : "billed") + ")" : ""}</label>`; }).join("");
+  const n = MON.filter(mo => mSel.has(mo.label) && !taken.has(mo.label)).length, kg = r2(n * m);
+  $("aSum").textContent = n + " month(s) x " + m + " kg = " + kg + " kg  |  " + (rate ? "bill " + "\u20B9" + r2(kg * rate) + " at \u20B9" + rate + " per kg" : "set the price per kg in Billing first");
 }
 function history() {
   const g = {};
-  REC.forEach(r => { const k = "M|" + r.month + "|" + r.date; (g[k] ||= { date: r.date, what: "Monthly - " + r.month, n: 0, kg: 0 }).n++; g[k].kg += Number(r.quantity); });
+  BILLS.filter(b => b.status === "paid").forEach(b => g["B" + b.id] = { date: stamp(b), what: "Bill " + b.billNo + " (" + (b.months || []).join(", ") + ")", n: 1, kg: Number(b.kg) });
+  REC.forEach(r => { const k = "M|" + r.month + "|" + r.date; (g[k] ||= { date: r.date, what: "Earlier monthly - " + r.month, n: 0, kg: 0 }).n++; g[k].kg += Number(r.quantity); });
   FES.filter(due).forEach(r => { const k = "F|" + (r.planId || r.festival) + "|" + r.date; (g[k] ||= { date: r.date, what: "Festival - " + r.festival, n: 0, kg: 0 }).n++; g[k].kg += Number(r.qty); });
   let run = 0;
   return Object.values(g).sort((a, b) => a.date.localeCompare(b.date)).map(x => ({ ...x, kg: r2(x.kg), left: r2(stock - (run += x.kg)) })).reverse();
 }
-$("aMonth").onchange = () => { skip.clear(); drawAlloc(); };
+$("aWho").onchange = () => { mSel.clear(); drawAllocForm(); };
+$("aF").onsubmit = safe(async () => {
+  const s = SH.find(x => x.id === $("aWho").value);
+  if (!s || !s.shortlisted) throw Error("Choose a shortlisted shareholder.");
+  const m = Number(s.monthlyKg) || 0, rate = Number(PS?.pricePerKg) || 0;
+  if (!m) throw Error(s.name + " has no monthly sugar set. Add it in Update Users.");
+  if (!rate) throw Error("Set the price per kg in Billing first.");
+  const taken = new Set(billsOf(s.id).filter(live).flatMap(b => b.months || []));
+  const chosen = MON.filter(mo => mSel.has(mo.label) && !taken.has(mo.label));
+  if (!chosen.length) throw Error("Tick at least one month.");
+  const kg = r2(chosen.length * m);
+  if (kg > remain(s)) throw Error("Only " + remain(s) + " kg is left for " + s.name + ", but " + chosen.length + " month(s) need " + kg + " kg.");
+  if (kg > left()) throw Error("Only " + left() + " kg is left in stock but this needs " + kg + " kg. Update the total stock on the Dashboard first.");
+  const billNo = nextBill();
+  await A.createBill({ billNo, org: PS?.orgName || "Sugar Distribution", shareholderId: s.id, uid: s.uid, name: s.name, season: s.season || "", months: chosen.map(x => x.label), monthKeys: chosen.map(x => x.key), kgPerMonth: m, kg, rate, amount: r2(kg * rate) });
+  mSel.clear(); show("bill");
+  alert("Bill " + billNo + " created for " + s.name + ": " + kg + " kg, \u20B9" + r2(kg * rate) + ". Use Show QR to collect payment, then Mark paid.");
+});
 
 /* ---------- festival ---------- */
 const plans = () => {
@@ -325,40 +370,40 @@ const plans = () => {
   });
   return Object.values(g).sort((a, b) => b.date.localeCompare(a.date));
 };
-const FS = () => SH.filter(s => s.shortlisted);
-const pickCount = () => $("fCount").textContent = FS().filter(s => !fOff.has(s.id)).length + " of " + FS().length + " selected";
+const pickCount = () => $("fCount").textContent = FS().filter(s => !skipF.has(s.id)).length + " of " + FS().length + " selected";
 
 /* ---------- drawing ---------- */
 function draw() {
-  const d = given(), pl = plans(), t = today();
+  const pl = plans(), t = today();
   $("sSh").textContent = SH.length; $("sList").textContent = FS().length;
-  $("sStock").textContent = stock + " kg"; $("sDist").textContent = d + " kg"; $("sRem").textContent = Math.max(left(), 0) + " kg";
-  $("sFest").textContent = pl.filter(p => p.date > t).length; $("sPay").textContent = PAY.filter(p => p.status === "pending").length;
+  $("sStock").textContent = stock + " kg"; $("sDist").textContent = given() + " kg"; $("sRes").textContent = reserved() + " kg";
+  $("sRem").textContent = Math.max(left(), 0) + " kg"; $("sUnpaid").textContent = BILLS.filter(b => b.status === "unpaid").length;
+  $("sFest").textContent = pl.filter(p => p.date > t).length;
 
   const f = $("shSearch").value.toLowerCase();
   tb("shT", SH.filter(s => [s.id, s.name, s.mobile, s.village, s.username].join(" ").toLowerCase().includes(f)),
     s => `<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.mobile)}</td><td>${esc(s.village)}</td><td>${esc(s.username)}</td><td>${net(s.id)}</td><td>${shortTag(s)}</td><td><button class="btn sm" data-hist="${esc(s.id)}">History</button> <button class="btn red sm" data-del="${esc(s.id)}">Delete</button></td></tr>`, 8);
 
   const uf = $("uSearch").value.toLowerCase();
-  tb("uT", SH.filter(s => [s.id, s.name, s.mobile, s.village, s.season].join(" ").toLowerCase().includes(uf)),
-    s => `<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.mobile)}</td><td>${esc(s.village)}</td><td>${esc(s.season || "-")}</td><td>${esc(s.caneTons ?? "-")}</td><td>${shortTag(s)}</td><td><button class="btn sm" data-edit="${esc(s.id)}">Edit</button></td></tr>`, 8);
+  tb("uT", SH.filter(s => [s.id, s.name, s.village, s.season].join(" ").toLowerCase().includes(uf)),
+    s => `<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${esc(s.village)}</td><td>${esc(s.season || "-")}</td><td>${esc(s.caneTons ?? "-")}</td><td>${esc(s.allotKg ?? "-")}</td><td>${esc(s.monthlyKg ?? "-")}</td><td>${shortTag(s)}</td><td><button class="btn sm" data-edit="${esc(s.id)}">Edit</button></td></tr>`, 9);
+  tb("cT", [...LOG].sort(newest).slice(0, 15), l => `<tr><td>${l.createdAt?.toDate ? l.createdAt.toDate().toLocaleString() : ""}</td><td>${esc(l.detail)}</td></tr>`, 2);
 
-  const keep = $("cWho").value;
-  $("cWho").innerHTML = SH.map(s => `<option value="${esc(s.id)}">${esc(s.id)} - ${esc(s.name)}</option>`).join("");
-  if (keep) $("cWho").value = keep;
-  const amt = dueAmt(); $("cAmt").readOnly = !!amt; if (amt) $("cAmt").value = amt;
-  $("cHint").textContent = amt ? "Fixed: " + kgEach() + " kg x \u20B9" + PS.pricePerKg + " per kg." : "Enter the amount you received.";
-  const pf = $("pSearch").value.toLowerCase();
-  tb("pT", [...PAY].sort(newest).filter(p => [p.name, p.shareholderId, p.month, p.method, p.ref, p.status, p.billNo].join(" ").toLowerCase().includes(pf)),
-    p => `<tr><td>${p.createdAt ? p.createdAt.toDate().toLocaleDateString() : ""}</td><td>${esc(p.name)} (${esc(p.shareholderId)})</td><td>${esc(p.month)}</td><td>${p.method === "cash" ? "Cash" : "Online"}</td><td>\u20B9${esc(p.amount)}</td><td>${esc(p.ref)}</td><td><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td><td>${
-      p.billNo ? `<button class="btn sm" data-view="${p.id}">Bill ${esc(p.billNo)}</button>`
-      : p.status === "pending" ? `<button class="btn green sm" data-ok="${p.id}">Confirm</button> <button class="btn red sm" data-no="${p.id}">Reject</button>`
-      : p.status === "approved" ? `<button class="btn green sm" data-bill="${p.id}">Generate bill</button>` : ""}</td></tr>`, 8);
-
-  drawAlloc();
+  const keep = $("aWho").value;
+  $("aWho").innerHTML = FS().map(s => `<option value="${esc(s.id)}">${esc(s.id)} - ${esc(s.name)}</option>`).join("");
+  if (FS().some(s => s.id === keep)) $("aWho").value = keep;
+  drawAllocForm();
+  tb("sT", FS(), s => { const m = Number(s.monthlyKg) || 0, rem = remain(s);
+    return `<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${s.allotKg || 0} kg</td><td>${kgPaid(s)} kg</td><td>${kgUnpaid(s)} kg</td><td><b>${rem} kg</b></td><td>${m ? Math.floor(rem / m + 1e-9) : 0}</td><td><button class="btn sm" data-alloc="${esc(s.id)}">Allocate</button></td></tr>`; }, 8);
   tb("hT", history(), h => `<tr><td>${esc(h.date)}</td><td>${esc(h.what)}</td><td>${h.n}</td><td>${h.kg} kg</td><td>${h.left} kg</td></tr>`, 5);
 
-  $("fPick").innerHTML = FS().length ? FS().map(s => `<label><input type="checkbox" data-f="${esc(s.id)}" ${fOff.has(s.id) ? "" : "checked"}>${esc(s.id)} - ${esc(s.name)} (${esc(s.village)})</label>`).join("")
+  const pf = $("pSearch").value.toLowerCase();
+  tb("pT", [...BILLS].sort(newest).filter(b => [b.billNo, b.name, b.shareholderId, (b.months || []).join(" "), b.status].join(" ").toLowerCase().includes(pf)),
+    b => `<tr><td>${esc(stamp(b))}</td><td>${esc(b.billNo)}</td><td>${esc(b.name)} (${esc(b.shareholderId)})</td><td>${esc((b.months || []).join(", "))}</td><td>${esc(b.kg)} kg</td><td>\u20B9${esc(b.amount)}</td><td><span class="tag ${esc(b.status)}">${esc(b.status)}</span></td><td>${
+      b.status === "unpaid" ? `<button class="btn sm" data-qr="${b.id}">Show QR</button> <button class="btn green sm" data-paid="${b.id}">Mark paid</button> <button class="btn gray sm" data-view="${b.id}">View</button> <button class="btn red sm" data-cbill="${b.id}">Cancel</button>`
+      : b.status === "paid" ? `<button class="btn gray sm" data-view="${b.id}">View bill</button>` : ""}</td></tr>`, 8);
+
+  $("fPick").innerHTML = FS().length ? FS().map(s => `<label><input type="checkbox" data-f="${esc(s.id)}" ${skipF.has(s.id) ? "" : "checked"}>${esc(s.id)} - ${esc(s.name)} (${esc(s.village)})</label>`).join("")
     : `<div class="empty">No one is shortlisted yet. Upload the factory list in Update Users first.</div>`;
   pickCount();
   tb("fT", pl, p => {
@@ -368,10 +413,11 @@ function draw() {
 
   const rf = $("rSearch").value.toLowerCase();
   const rows = [
-    ...REC.map(r => ({ id: r.shareholderId, type: "Monthly", what: r.month, qty: Number(r.quantity), date: r.date, soon: false })),
-    ...FES.map(r => ({ id: r.shareholderId, type: "Festival", what: r.festival, qty: Number(r.qty), date: r.date, soon: r.date > t }))
-  ].sort((a, b) => b.date.localeCompare(a.date)).filter(r => [r.id, name(r.id), r.type, r.what, r.date, r.soon ? "scheduled" : "given"].join(" ").toLowerCase().includes(rf));
-  tb("rT", rows, r => `<tr><td>${esc(r.id)} - ${esc(name(r.id))}</td><td>${r.type}</td><td>${esc(r.what)}</td><td style="color:${r.qty < 0 ? "#dc2626" : "inherit"}">${signed(r.qty, r.type === "Festival")}</td><td>${esc(r.date)}</td><td><span class="tag ${r.soon ? "pending" : "approved"}">${r.soon ? "Scheduled" : "Given"}</span></td></tr>`, 6);
+    ...BILLS.filter(live).map(b => ({ id: b.shareholderId, type: "Monthly (bill " + b.billNo + ")", what: (b.months || []).join(", "), qty: Number(b.kg), date: stamp(b), st: b.status === "paid" ? "Paid" : "Unpaid", cls: b.status === "paid" ? "approved" : "pending" })),
+    ...REC.map(r => ({ id: r.shareholderId, type: "Earlier monthly", what: r.month, qty: Number(r.quantity), date: r.date, st: "Given", cls: "approved" })),
+    ...FES.map(r => ({ id: r.shareholderId, type: "Festival", what: r.festival, qty: Number(r.qty), date: r.date, st: r.date > t ? "Scheduled" : "Given", cls: r.date > t ? "pending" : "approved" }))
+  ].sort((a, b) => b.date.localeCompare(a.date)).filter(r => [r.id, name(r.id), r.type, r.what, r.date, r.st].join(" ").toLowerCase().includes(rf));
+  tb("rT", rows, r => `<tr><td>${esc(r.id)} - ${esc(name(r.id))}</td><td>${esc(r.type)}</td><td>${esc(r.what)}</td><td style="color:${r.qty < 0 ? "#dc2626" : "inherit"}">${signed(r.qty, r.type === "Festival")}</td><td>${esc(r.date)}</td><td><span class="tag ${r.cls}">${r.st}</span></td></tr>`, 6);
 }
 ["shSearch", "uSearch", "pSearch", "rSearch"].forEach(i => $(i).oninput = draw);
 
@@ -379,91 +425,91 @@ function draw() {
 A.watch("shareholders", l => { SH = l.sort((a, b) => a.id.localeCompare(b.id)); draw(); });
 A.watch("records", l => { REC = l; draw(); });
 A.watch("festival", l => { FES = l; draw(); });
-A.watch("payments", l => { PAY = l; draw(); });
+A.watch("bills", l => { BILLS = l; draw(); });
+A.watch("log", l => { LOG = l; draw(); });
 A.watchDoc("settings/stock", d => { stock = d?.total ?? 8500; $("stk").value = stock; draw(); });
-A.watchDoc("settings/sugar", d => { SUGAR = d; $("kgIn").value = d?.monthlyKg ?? ""; draw(); });
 A.watchDoc("settings/payment", d => {
   PS = d; draw(); if (!d) return;
   $("bOrg").value = d.orgName || ""; $("bUpi").value = d.upiId || ""; $("bPrice").value = d.pricePerKg || ""; $("bNote").value = d.note || "";
   $("qrPreview").hidden = !d.qrImage; if (d.qrImage) $("qrPreview").src = d.qrImage;
 });
 
-/* ---------- history popup ---------- */
+/* ---------- popups ---------- */
 function openHist(id) {
   const s = SH.find(x => x.id === id); if (!s) return;
+  const paid = billsOf(id).filter(b => b.status === "paid");
   const rows = [
+    ...paid.flatMap(b => (b.months || []).map(m => ({ d: stamp(b), f: m, q: Number(b.kgPerMonth) }))),
     ...REC.filter(r => r.shareholderId === id).map(r => ({ d: r.date, f: r.month, q: Number(r.quantity) })),
     ...FES.filter(r => r.shareholderId === id && due(r)).map(r => ({ d: r.date, f: r.festival + " (festival)", q: Number(r.qty) }))
   ].sort((a, b) => a.d.localeCompare(b.d));
-  let run = 0; const withRun = rows.map(r => ({ ...r, t: r2(run += r.q) })).reverse();
-  const pays = PAY.filter(p => p.shareholderId === id).sort(newest);
-  $("hTitle").textContent = s.name + " (" + s.id + ")  -  received " + net(id) + " kg";
+  let run = 0; const led = rows.map(r => ({ ...r, t: r2(run += r.q) })).reverse();
+  $("hTitle").textContent = s.name + " (" + s.id + ")  -  received " + net(id) + " kg, remaining this season " + remain(s) + " kg";
   $("hBody").innerHTML = `<div class="wrap"><table><thead><tr><th>Date</th><th>For</th><th>Quantity</th><th>Total so far</th></tr></thead><tbody>${
-    withRun.length ? withRun.map(r => `<tr><td>${esc(r.d)}</td><td>${esc(r.f)}</td><td>${r.q} kg</td><td>${r.t} kg</td></tr>`).join("") : `<tr><td colspan="4" class="empty">No sugar given yet.</td></tr>`}</tbody></table></div>
-    <h3 style="margin:18px 0 10px">Payments</h3><div class="wrap"><table><thead><tr><th>Month</th><th>Method</th><th>Amount</th><th>Status</th><th>Bill</th></tr></thead><tbody>${
-    pays.length ? pays.map(p => `<tr><td>${esc(p.month)}</td><td>${p.method === "cash" ? "Cash" : "Online"}</td><td>\u20B9${esc(p.amount)}</td><td><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td><td>${esc(p.billNo || "-")}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">No payments yet.</td></tr>`}</tbody></table></div>`;
+    led.length ? led.map(r => `<tr><td>${esc(r.d)}</td><td>${esc(r.f)}</td><td>${r.q} kg</td><td>${r.t} kg</td></tr>`).join("") : `<tr><td colspan="4" class="empty">No sugar given yet.</td></tr>`}</tbody></table></div>
+    <h3 style="margin:18px 0 10px">Bills</h3><div class="wrap"><table><thead><tr><th>Bill</th><th>Months</th><th>Sugar</th><th>Amount</th><th>Status</th></tr></thead><tbody>${
+    billsOf(id).length ? billsOf(id).sort(newest).map(b => `<tr><td>${esc(b.billNo)}</td><td>${esc((b.months || []).join(", "))}</td><td>${esc(b.kg)} kg</td><td>\u20B9${esc(b.amount)}</td><td><span class="tag ${esc(b.status)}">${esc(b.status)}</span></td></tr>`).join("") : `<tr><td colspan="5" class="empty">No bills yet.</td></tr>`}</tbody></table></div>`;
   $("hist").hidden = false;
 }
 $("hClose").onclick = () => $("hist").hidden = true;
+const closePay = () => { $("payModal").hidden = true; payTarget = null; };
+$("mNo").onclick = closePay;
+$("mOk").onclick = async () => {
+  try {
+    const b = BILLS.find(x => x.id === payTarget); if (!b) return;
+    const cash = $("mCash").checked;
+    await A.markBillPaid(b.id, cash ? "cash" : "online", cash ? "Cash" : $("mRef").value.trim());
+    closePay(); alert("Saved. " + b.billNo + " is marked as paid and the sugar is counted as given.");
+  } catch (x) { alert(x.message); }
+};
 
-/* ---------- edit shareholder ---------- */
+/* ---------- edit by hand ---------- */
 const closeEdit = () => { $("uF").hidden = true; $("uHint").hidden = false; };
 function openEdit(s) {
   if (!s) return;
   $("uId").value = s.id; $("uName").value = s.name || ""; $("uMob").value = s.mobile || ""; $("uVil").value = s.village || "";
+  $("uSeason").value = s.season || ""; $("uCane").value = s.caneTons ?? ""; $("uTotal").value = s.allotKg ?? ""; $("uMonthly").value = s.monthlyKg ?? "";
+  $("uShort").value = s.shortlisted ? "yes" : "no";
   $("uF").hidden = false; $("uHint").hidden = true; $("uF").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 $("uCancel").onclick = closeEdit;
 $("uF").onsubmit = safe(async () => {
   const s = SH.find(x => x.id === $("uId").value);
   if (!s) throw Error("Shareholder not found.");
-  await A.updateShareholder(s, { name: $("uName").value.trim(), mobile: $("uMob").value.trim(), village: $("uVil").value.trim() });
-  closeEdit(); alert("Details updated.");
+  const data = { name: $("uName").value.trim(), mobile: $("uMob").value.trim(), village: $("uVil").value.trim(), season: $("uSeason").value.trim(),
+    caneTons: r2(Number($("uCane").value) || 0), allotKg: r2(Number($("uTotal").value) || 0), monthlyKg: r2(Number($("uMonthly").value) || 0), shortlisted: $("uShort").value === "yes" };
+  const old = { name: s.name || "", mobile: s.mobile || "", village: s.village || "", season: s.season || "", caneTons: s.caneTons || 0, allotKg: s.allotKg || 0, monthlyKg: s.monthlyKg || 0, shortlisted: !!s.shortlisted };
+  const diff = Object.keys(data).filter(k => old[k] !== data[k]).map(k => k + ": " + old[k] + " -> " + data[k]);
+  if (!diff.length) throw Error("Nothing was changed.");
+  await A.updateShareholder(s, data, diff.join(", "));
+  closeEdit(); alert("Saved to Firestore.");
 });
 
 /* ---------- clicks and ticks ---------- */
-const nextBill = () => {
-  const n = Math.max(0, ...PAY.map(p => parseInt(String(p.billNo || "").split("-").pop(), 10) || 0));
-  return "SB-" + new Date().getFullYear() + "-" + String(n + 1).padStart(4, "0");
-};
-const viewBill = p => { const s = SH.find(x => x.id === p.shareholderId) || {}; A.showBill(p, { org: PS?.orgName, village: s.village, mobile: s.mobile }); };
+const viewBill = b => { const s = SH.find(x => x.id === b.shareholderId) || {}; A.showBill(b, { village: s.village, mobile: s.mobile }); };
 document.addEventListener("click", async e => {
   const d = e.target.dataset;
   try {
     if (d.del && confirm("Delete this shareholder? Their login stops working; past records are kept.")) await A.removeShareholder(SH.find(s => s.id === d.del));
-    if (d.edit) openEdit(SH.find(s => s.id === d.edit));
+    if (d.edit) { show("upd"); openEdit(SH.find(s => s.id === d.edit)); }
     if (d.hist) openHist(d.hist);
-    if (d.ok && confirm("Confirm that this payment was received?")) await A.setPaymentStatus(d.ok, "approved");
-    if (d.no && confirm("Reject this payment?")) await A.setPaymentStatus(d.no, "rejected");
-    if (d.bill) {
-      const p = PAY.find(x => x.id === d.bill);
-      if (p && !p.billNo && confirm("Generate the bill now? The bill number cannot be changed afterwards.")) await A.generateBill(p.id, nextBill(), kgEach());
-    }
-    if (d.view) viewBill(PAY.find(x => x.id === d.view));
+    if (d.alloc) { $("aWho").value = d.alloc; mSel.clear(); drawAllocForm(); $("aF").scrollIntoView({ behavior: "smooth" }); }
+    if (d.qr) A.showQr(BILLS.find(b => b.id === d.qr), PS || {});
+    if (d.paid) { const b = BILLS.find(x => x.id === d.paid); payTarget = d.paid; $("pmTitle").textContent = "Mark " + b.billNo + " as paid"; $("pmSub").textContent = b.name + " - \u20B9" + b.amount + " for " + (b.months || []).join(", "); $("mRef").value = ""; $("mOnline").checked = true; $("payModal").hidden = false; }
+    if (d.view) viewBill(BILLS.find(b => b.id === d.view));
+    if (d.cbill && confirm("Cancel this unpaid bill? The months become free to bill again.")) await A.cancelBill(d.cbill);
     if (d.cancel && confirm("Cancel this festival sugar? It will be removed for every shareholder in it.")) await A.removeFestival(d.cancel.split(","));
   } catch (x) { alert(x.message); }
 });
 document.addEventListener("change", e => {
-  const id = e.target.dataset.on, f = e.target.dataset.f;
-  if (id) { e.target.checked ? skip.delete(id) : skip.add(id); drawAlloc(); }
-  if (f) { e.target.checked ? fOff.delete(f) : fOff.add(f); pickCount(); }
-  if (e.target.id === "aAll") {
-    const m = $("aMonth").value;
-    SH.filter(s => statusOf(s, m) === "ready").forEach(s => e.target.checked ? skip.delete(s.id) : skip.add(s.id));
-    drawAlloc();
-  }
+  const mo = e.target.dataset.mo, f = e.target.dataset.f;
+  if (mo) { e.target.checked ? mSel.add(mo) : mSel.delete(mo); drawAllocForm(); }
+  if (f) { e.target.checked ? skipF.delete(f) : skipF.add(f); pickCount(); }
 });
-$("fAll").onclick = () => { FS().some(s => !fOff.has(s.id)) ? FS().forEach(s => fOff.add(s.id)) : fOff.clear(); draw(); };
+$("fAll").onclick = () => { FS().some(s => !skipF.has(s.id)) ? FS().forEach(s => skipF.add(s.id)) : skipF.clear(); draw(); };
 
 /* ---------- forms ---------- */
-$("stockF").onsubmit = safe(async () => { await A.setStock(Number($("stk").value)); alert("Stock updated."); });
-
-$("kgF").onsubmit = safe(async () => {
-  const v = Number($("kgIn").value);
-  if (!(v > 0)) throw Error("Enter a quantity above 0.");
-  if (!confirm("From now on every allocation gives " + v + " kg to EVERY shareholder. Continue?")) return;
-  await A.setSugar(v); alert("Saved.");
-});
+$("stockF").onsubmit = safe(async () => { await A.setStock(Number($("stk").value)); alert("Stock saved."); });
 
 $("shF").onsubmit = safe(async e => {
   await A.addShareholder({ id: $("shId").value.trim(), name: $("shName").value.trim(), mobile: $("shMob").value.trim(), village: $("shVil").value.trim() }, $("shUser").value, $("shPass").value);
@@ -481,37 +527,17 @@ const toData = f => new Promise((ok, no) => {
 $("bF").onsubmit = safe(async () => {
   const f = $("bFile").files[0], img = f ? await toData(f) : (PS?.qrImage || "");
   await A.savePayment({ orgName: $("bOrg").value.trim(), upiId: $("bUpi").value.trim(), pricePerKg: Number($("bPrice").value) || 0, note: $("bNote").value.trim(), qrImage: img });
-  $("bFile").value = ""; alert("Saved. Shareholders see these payment details in their Billing tab.");
-});
-
-$("cF").onsubmit = safe(async e => {
-  const s = SH.find(x => x.id === $("cWho").value), mo = MON.find(m => m.label === $("cMonth").value), amt = Number($("cAmt").value);
-  if (!s) throw Error("Choose a shareholder.");
-  if (!(amt > 0)) throw Error("Enter the amount received.");
-  if (payOf(s.id, mo.label)) throw Error(s.name + " already has a payment for " + mo.label + ".");
-  await A.addCashPayment({ uid: s.uid, shareholderId: s.id, name: s.name, method: "cash", month: mo.label, monthKey: mo.key, amount: amt, ref: "Cash" });
-  if (!dueAmt()) $("cAmt").value = "";
-  alert("Cash payment recorded. Use Generate bill in the table below.");
-});
-
-$("aF").onsubmit = safe(async () => {
-  const mo = MON.find(m => m.label === $("aMonth").value), date = $("aDate").value, kg = kgEach(), list = picked();
-  if (!kg) throw Error("First save the monthly sugar per shareholder (kg) at the top of this tab.");
-  if (!list.length) throw Error("Nobody is ready. A shareholder must be shortlisted, have a confirmed payment for this month, and not already be given.");
-  const total = r2(list.length * kg);
-  if (total > left()) throw Error("Only " + left() + " kg is left in stock but this needs " + total + " kg. Update the total stock on the Dashboard first.");
-  await A.addRecords(list.map(s => ({ shareholderId: s.id, uid: s.uid, month: mo.label, monthKey: mo.key, quantity: kg, date })));
-  skip.clear(); alert(total + " kg given to " + list.length + " shareholder(s) for " + mo.label + ".");
+  $("bFile").value = ""; alert("Payment details saved.");
 });
 
 $("fF").onsubmit = safe(async () => {
   const type = $("fType").value, q = Number($("fQty").value), date = $("fDate").value, festival = $("fName").value.trim();
-  const list = FS().filter(s => !fOff.has(s.id));
+  const list = FS().filter(s => !skipF.has(s.id));
   if (!list.length) throw Error("Tick at least one shortlisted shareholder.");
   if (type === "reduce") { const bad = list.find(s => net(s.id) < q); if (bad) throw Error(bad.name + " only has " + net(bad.id) + " kg, so you cannot reduce by " + q + " kg."); }
   const planId = "p" + Date.now();
   await A.addFestival(list.map(s => ({ planId, festival, shareholderId: s.id, uid: s.uid, type, qty: type === "add" ? q : -q, date })));
-  $("fName").value = ""; $("fQty").value = ""; resetDates();
+  $("fName").value = ""; $("fQty").value = ""; $("fDate").value = today();
   alert(date > today() ? "Saved. It shows in Records as Scheduled and counts from " + date + "." : "Festival sugar saved.");
 });
 </script>
