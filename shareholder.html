@@ -17,8 +17,6 @@ main{margin-left:240px;padding:25px}
 .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:25px}
 .top h2{font-size:25px}
 .menu{display:none;background:#111827;color:#fff;border:0;padding:10px 13px;border-radius:7px}
-.conn{font-size:13px;padding:5px 11px;border-radius:99px;font-weight:600}
-.conn.ok{background:#dcfce7;color:#166534}.conn.bad{background:#fee2e2;color:#991b1b}
 .alert{background:#fee2e2;color:#991b1b;padding:12px 15px;border-radius:8px;margin-bottom:18px;font-size:14px}
 section{display:none}section.on{display:block}
 .welcome{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;padding:25px;border-radius:12px;margin-bottom:22px}
@@ -44,18 +42,20 @@ th{background:#f9fafb;color:#374151}
 <body>
 <aside class="side" id="side"><div class="logo">Sugar Distribution</div><div id="nav"></div><button class="out" id="logout">Logout</button></aside>
 <main>
-  <div class="top"><button class="menu" id="menu">&#9776;</button><h2 id="title">Dashboard</h2><span class="conn" id="conn" hidden></span><span id="who">Shareholder</span></div>
+  <div class="top"><button class="menu" id="menu">&#9776;</button><h2 id="title">Dashboard</h2><span id="who">Shareholder</span></div>
   <div id="dbErr" class="alert" hidden></div>
 
   <section id="dash">
     <div class="welcome"><h2 id="welcome">Welcome</h2><div id="meta"></div></div>
     <div class="note" id="thisMonth"></div>
+    <div class="note" id="declared"></div>
     <div class="stats">
-      <div class="stat"><h3>Sugar Allotted (season)</h3><b id="sAllot">0 kg</b></div>
+      <div class="stat"><h3>Sugar Allocated</h3><b id="sAllot">0 kg</b></div>
       <div class="stat"><h3>Received (paid)</h3><b id="sGot">0 kg</b></div>
       <div class="stat"><h3>Billed, Not Paid Yet</h3><b id="sWait">0 kg</b></div>
-      <div class="stat"><h3>Remaining</h3><b id="sRem">0 kg</b></div>
+      <div class="stat"><h3>Remaining to Collect</h3><b id="sRem">0 kg</b></div>
     </div>
+    <div class="card"><h3>Remaining Months (not collected yet)</h3><div class="wrap"><table><thead><tr><th>Month</th><th>Sugar</th></tr></thead><tbody id="pend"></tbody></table></div></div>
     <div class="card" id="soonCard" hidden><h3>Coming Soon</h3><div class="wrap"><table><thead><tr><th>Festival</th><th>Extra sugar</th><th>On</th></tr></thead><tbody id="soon"></tbody></table></div></div>
     <div class="card"><h3>Recent Sugar</h3><div class="wrap"><table><thead><tr><th>For</th><th>Quantity</th><th>Date</th></tr></thead><tbody id="recent"></tbody></table></div></div>
   </section>
@@ -65,7 +65,7 @@ th{background:#f9fafb;color:#374151}
   </section>
 
   <section id="billing">
-    <div class="note">Your bill is made by the admin when sugar is allocated to you. Pay the admin directly (the admin will show you the QR code or take cash) and the admin marks the bill as paid.</div>
+    <div class="note">Your bill is made by the admin when you come to collect the sugar allocated to you. Pay the admin directly (the admin will show you the QR code or take cash) and the admin marks the bill as paid.</div>
     <div class="card"><h3>My Bills</h3><div class="wrap"><table><thead><tr><th>Date</th><th>Bill No</th><th>Months</th><th>Sugar</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody id="bT"></tbody></table></div></div>
   </section>
 </main>
@@ -74,8 +74,8 @@ th{background:#f9fafb;color:#374151}
 import * as A from "./apis.js";
 const $ = id => document.getElementById(id), esc = A.esc;
 const me = await A.guard("shareholder");   // admins and logged-out visitors are sent back to index.html
-let sh = {}, REC = [], FES = [], BILLS = [];
-const THIS = A.monthOptions(0, 1)[0].label;
+let sh = {}, REC = [], FES = [], BILLS = [], ENT = [], GS = {};
+const THIS = A.monthOptions(0, 1)[0].label, THISKEY = A.monthOptions(0, 1)[0].key;
 
 const ymd = d => new Date(d - d.getTimezoneOffset() * 60000).toISOString().split("T")[0];
 const today = () => ymd(new Date());
@@ -101,22 +101,26 @@ $("welcome").textContent = "Welcome, " + me.name;
 const row = (list, cols, n) => list.length ? list.map(r => `<tr>${cols(r)}</tr>`).join("") : `<tr><td colspan="${n}" class="empty">Nothing here yet.</td></tr>`;
 
 function draw() {
-  const t = today(), mine = BILLS.filter(b => b.status !== "cancelled"), season = BILLS.filter(b => b.season === sh.season);
+  const t = today(), mine = BILLS.filter(b => b.status !== "cancelled");
+  const taken = new Set(mine.flatMap(b => b.monthKeys || []));
+  const pend = ENT.filter(e => !taken.has(e.monthKey)).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
   $("meta").textContent = "ID: " + me.shareholderId + (sh.village ? "  |  Village: " + sh.village : "") + (sh.season ? "  |  Season: " + sh.season : "");
 
-  const got = sumK(season.filter(b => b.status === "paid")), wait = sumK(season.filter(b => b.status === "unpaid")), allot = Number(sh.allotKg) || 0;
-  $("sAllot").textContent = allot + " kg"; $("sGot").textContent = got + " kg"; $("sWait").textContent = wait + " kg"; $("sRem").textContent = r2(allot - got - wait) + " kg";
+  const got = sumK(mine.filter(b => b.status === "paid")), wait = sumK(mine.filter(b => b.status === "unpaid")), allot = r2(ENT.reduce((a, e) => a + Number(e.kg || 0), 0)), remKg = r2(pend.reduce((a, e) => a + Number(e.kg || 0), 0));
+  $("sAllot").textContent = allot + " kg"; $("sGot").textContent = got + " kg"; $("sWait").textContent = wait + " kg"; $("sRem").textContent = remKg + " kg";
+  $("pend").innerHTML = row(pend, e => `<td>${esc(e.month)}</td><td>${esc(e.kg)} kg</td>`, 2);
+  $("declared").textContent = GS.monthlyKg ? "Declared sugar: " + GS.monthlyKg + " kg per month" + (GS.pricePerKg ? " at \u20B9" + GS.pricePerKg + " per kg." : ".") : "The monthly sugar and price have not been declared yet.";
 
-  const cur = mine.find(b => (b.months || []).includes(THIS));
+  const cur = mine.find(b => (b.monthKeys || []).includes(THISKEY) || (b.months || []).includes(THIS)), ent = ENT.find(e => e.monthKey === THISKEY);
   $("thisMonth").textContent = !sh.shortlisted ? "You are not on the shortlist for this season yet, so sugar cannot be given."
-    : !cur ? THIS + ": no sugar has been billed for you yet. Ask the admin to allocate it."
-    : cur.status === "paid" ? THIS + ": your sugar is paid and given."
-    : THIS + ": your bill " + cur.billNo + " is ready. Pay the admin to receive your sugar.";
+    : cur ? (cur.status === "paid" ? THIS + ": your sugar is paid and given." : THIS + ": your bill " + cur.billNo + " is ready. Pay the admin to receive your sugar.")
+    : ent ? THIS + ": " + ent.kg + " kg is allocated for you. Ask the admin to make your bill."
+    : THIS + ": sugar has not been allocated yet.";
 
   // Festival sugar counts only from its date; before that it is listed as "Coming Soon".
   const soon = FES.filter(r => r.date > t).sort((a, b) => a.date.localeCompare(b.date));
   const items = [
-    ...BILLS.filter(b => b.status === "paid").flatMap(b => (b.months || []).map(m => ({ label: m, qty: Number(b.kgPerMonth), date: stamp(b), fest: false }))),
+    ...BILLS.filter(b => b.status === "paid").flatMap(b => (b.months || []).map((m, i) => ({ label: m, qty: Number(b.items?.[i]?.kg ?? b.kgPerMonth) || 0, date: stamp(b), fest: false }))),
     ...REC.map(r => ({ label: r.month, qty: Number(r.quantity), date: r.date, fest: false })),
     ...FES.filter(r => r.date <= t).map(r => ({ label: r.festival + " (festival)", qty: Number(r.qty), date: r.date, fest: true }))
   ];
@@ -137,6 +141,8 @@ A.watchDoc("shareholders/" + me.shareholderId, d => { sh = d || {}; draw(); });
 A.watch("bills", l => { BILLS = l; draw(); }, me.uid);
 A.watch("records", l => { REC = l; draw(); }, me.uid);
 A.watch("festival", l => { FES = l; draw(); }, me.uid);
+A.watch("entitlements", l => { ENT = l; draw(); }, me.uid);
+A.watchDoc("settings/global", d => { GS = d || {}; draw(); });
 
 document.addEventListener("click", e => {
   const id = e.target.dataset.view; if (!id) return;
