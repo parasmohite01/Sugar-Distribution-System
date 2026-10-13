@@ -14,9 +14,11 @@ body{background:#f5f7fb;color:#1f2937}
 .nav:hover,.nav.act{background:#2563eb;color:#fff}
 .out{position:absolute;bottom:20px;left:15px;width:calc(100% - 30px);padding:11px;background:#dc2626;color:#fff;border:0;border-radius:8px;cursor:pointer}
 main{margin-left:240px;padding:25px}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:25px}
 .top h2{font-size:25px}
 .menu{display:none;background:#111827;color:#fff;border:0;padding:10px 13px;border-radius:7px}
+.conn{font-size:13px;padding:5px 11px;border-radius:99px;font-weight:600}
+.conn.ok{background:#dcfce7;color:#166534}.conn.bad{background:#fee2e2;color:#991b1b}
 .alert{background:#fee2e2;color:#991b1b;padding:12px 15px;border-radius:8px;margin-bottom:18px;font-size:14px}
 section{display:none}section.on{display:block}
 .welcome{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;padding:25px;border-radius:12px;margin-bottom:22px}
@@ -33,40 +35,26 @@ table{width:100%;border-collapse:collapse}
 th,td{padding:12px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:14px}
 th{background:#f9fafb;color:#374151}
 .empty{text-align:center;color:#6b7280;padding:22px}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
-.fg{display:flex;flex-direction:column}
-.fg label{margin-bottom:7px;font-weight:600;font-size:14px}
-input,select{padding:11px;border:1px solid #d1d5db;border-radius:7px;font-size:14px}
-input:focus,select:focus{outline:0;border-color:#2563eb}
-input[readonly]{background:#f3f4f6}
-input[type=radio]{width:18px;height:18px;padding:0}
-.opt{display:flex;gap:22px;margin-bottom:16px}
-.opt label{display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer}
-.full{grid-column:1/-1}
-.hint{font-size:13px;color:#6b7280;margin-top:6px}
-.btn{padding:11px 16px;border:0;border-radius:7px;cursor:pointer;font-size:14px;background:#2563eb;color:#fff}
-.btn.sm{padding:6px 10px;font-size:13px}.btn.gray{background:#6b7280}
-.btn:disabled{opacity:.6;cursor:wait}
+.btn{padding:6px 10px;border:0;border-radius:7px;cursor:pointer;font-size:13px;background:#2563eb;color:#fff}
 .tag{padding:3px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
-.pending{background:#fef3c7;color:#92400e}.approved{background:#dcfce7;color:#166534}.rejected{background:#fee2e2;color:#991b1b}
-#qrImg{max-width:260px;width:100%;border:1px solid #e5e7eb;border-radius:10px;margin-top:10px}
-@media(max-width:750px){.side{transform:translateX(-100%);transition:.3s}.side.open{transform:none}main{margin-left:0;padding:14px}.menu{display:block}.grid{grid-template-columns:1fr}}
+.unpaid{background:#fef3c7;color:#92400e}.paid{background:#dcfce7;color:#166534}.cancelled{background:#fee2e2;color:#991b1b}
+@media(max-width:750px){.side{transform:translateX(-100%);transition:.3s}.side.open{transform:none}main{margin-left:0;padding:14px}.menu{display:block}}
 </style>
 </head>
 <body>
 <aside class="side" id="side"><div class="logo">Sugar Distribution</div><div id="nav"></div><button class="out" id="logout">Logout</button></aside>
 <main>
-  <div class="top"><button class="menu" id="menu">&#9776;</button><h2 id="title">Dashboard</h2><span id="who">Shareholder</span></div>
+  <div class="top"><button class="menu" id="menu">&#9776;</button><h2 id="title">Dashboard</h2><span class="conn" id="conn" hidden></span><span id="who">Shareholder</span></div>
   <div id="dbErr" class="alert" hidden></div>
 
   <section id="dash">
     <div class="welcome"><h2 id="welcome">Welcome</h2><div id="meta"></div></div>
     <div class="note" id="thisMonth"></div>
     <div class="stats">
-      <div class="stat"><h3>Total Sugar Received</h3><b id="sTotal">0 kg</b></div>
-      <div class="stat"><h3>Monthly Share</h3><b id="sShare">-</b></div>
-      <div class="stat"><h3>Shortlist Status</h3><b id="sList">-</b></div>
-      <div class="stat"><h3>Payments Confirmed</h3><b id="sPaid">&#8377;0</b></div>
+      <div class="stat"><h3>Sugar Allotted (season)</h3><b id="sAllot">0 kg</b></div>
+      <div class="stat"><h3>Received (paid)</h3><b id="sGot">0 kg</b></div>
+      <div class="stat"><h3>Billed, Not Paid Yet</h3><b id="sWait">0 kg</b></div>
+      <div class="stat"><h3>Remaining</h3><b id="sRem">0 kg</b></div>
     </div>
     <div class="card" id="soonCard" hidden><h3>Coming Soon</h3><div class="wrap"><table><thead><tr><th>Festival</th><th>Extra sugar</th><th>On</th></tr></thead><tbody id="soon"></tbody></table></div></div>
     <div class="card"><h3>Recent Sugar</h3><div class="wrap"><table><thead><tr><th>For</th><th>Quantity</th><th>Date</th></tr></thead><tbody id="recent"></tbody></table></div></div>
@@ -77,30 +65,8 @@ input[type=radio]{width:18px;height:18px;padding:0}
   </section>
 
   <section id="billing">
-    <div class="card"><h3>Pay for Sugar</h3>
-      <div class="opt">
-        <label><input type="radio" name="pm" id="pmOnline" checked> Pay online (UPI / QR)</label>
-        <label><input type="radio" name="pm" id="pmCash"> Pay cash</label>
-      </div>
-      <div id="onlineBox">
-        <p id="upiLine"></p>
-        <img id="qrImg" alt="Payment QR code" hidden>
-        <p class="hint" id="noteLine"></p>
-        <p class="hint" id="noOnline" hidden>The admin has not set up online payment yet. Please choose Pay cash.</p>
-      </div>
-      <p id="cashNote" class="hint" hidden>Give the cash to the admin. After you submit, the admin confirms it here and gives you a bill.</p>
-      <form id="pF" class="grid" style="margin-top:16px">
-        <div class="fg"><label for="pMonth">Sugar for month</label><select id="pMonth"></select></div>
-        <div class="fg"><label for="amt">Amount (&#8377;)</label><input id="amt" type="number" min="1" step="0.01" required><span class="hint" id="amtHint"></span></div>
-        <div class="fg full" id="refBox"><label for="ref">UPI transaction ID (after you pay)</label><input id="ref"></div>
-        <div><button class="btn" id="pBtn">Submit payment</button></div>
-      </form></div>
-    <div class="stats">
-      <div class="stat"><h3>Total Submitted</h3><b id="pSub">&#8377;0</b></div>
-      <div class="stat"><h3>Confirmed</h3><b id="pApp">&#8377;0</b></div>
-      <div class="stat"><h3>Waiting for Admin</h3><b id="pPend">0</b></div>
-    </div>
-    <div class="card"><h3>My Payments and Bills</h3><div class="wrap"><table><thead><tr><th>Date</th><th>Month</th><th>Method</th><th>Amount</th><th>Reference</th><th>Status</th><th>Bill</th></tr></thead><tbody id="pT"></tbody></table></div></div>
+    <div class="note">Your bill is made by the admin when sugar is allocated to you. Pay the admin directly (the admin will show you the QR code or take cash) and the admin marks the bill as paid.</div>
+    <div class="card"><h3>My Bills</h3><div class="wrap"><table><thead><tr><th>Date</th><th>Bill No</th><th>Months</th><th>Sugar</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody id="bT"></tbody></table></div></div>
   </section>
 </main>
 
@@ -108,14 +74,16 @@ input[type=radio]{width:18px;height:18px;padding:0}
 import * as A from "./apis.js";
 const $ = id => document.getElementById(id), esc = A.esc;
 const me = await A.guard("shareholder");   // admins and logged-out visitors are sent back to index.html
-let sh = {}, REC = [], FES = [], PAY = [], SUGAR = null, PS = null;
-const MON = A.monthOptions(-1, 4), THIS = A.monthOptions(0, 1)[0].label;
+let sh = {}, REC = [], FES = [], BILLS = [];
+const THIS = A.monthOptions(0, 1)[0].label;
 
-const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().split("T")[0]; };
+const ymd = d => new Date(d - d.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+const today = () => ymd(new Date());
 const r2 = n => Math.round(n * 100) / 100;
-const rs = n => "\u20B9" + r2(n);
+const stamp = b => (b.paidAt || b.createdAt)?.toDate ? ymd((b.paidAt || b.createdAt).toDate()) : today();
+const sumK = l => r2(l.reduce((a, b) => a + Number(b.kg || 0), 0));
 
-const TABS = [["dash", "Dashboard"], ["sugar", "My Sugar"], ["billing", "Billing"]];
+const TABS = [["dash", "Dashboard"], ["sugar", "My Sugar"], ["billing", "Bills"]];
 $("nav").innerHTML = TABS.map(([id, l]) => `<div class="nav" data-t="${id}">${l}</div>`).join("");
 const show = id => {
   document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === id));
@@ -132,90 +100,49 @@ $("welcome").textContent = "Welcome, " + me.name;
 
 const row = (list, cols, n) => list.length ? list.map(r => `<tr>${cols(r)}</tr>`).join("") : `<tr><td colspan="${n}" class="empty">Nothing here yet.</td></tr>`;
 
-function setMethod() {
-  const online = $("pmOnline").checked;
-  $("onlineBox").hidden = !online; $("cashNote").hidden = online; $("refBox").hidden = !online; $("ref").required = online;
-}
-document.querySelectorAll("input[name=pm]").forEach(r => r.onchange = setMethod);
-setMethod();
-
 function draw() {
-  const t = today(), kg = Number(SUGAR?.monthlyKg) || 0, price = Number(PS?.pricePerKg) || 0;
-  $("meta").textContent = "ID: " + me.shareholderId + (sh.village ? "  |  Village: " + sh.village : "");
+  const t = today(), mine = BILLS.filter(b => b.status !== "cancelled"), season = BILLS.filter(b => b.season === sh.season);
+  $("meta").textContent = "ID: " + me.shareholderId + (sh.village ? "  |  Village: " + sh.village : "") + (sh.season ? "  |  Season: " + sh.season : "");
+
+  const got = sumK(season.filter(b => b.status === "paid")), wait = sumK(season.filter(b => b.status === "unpaid")), allot = Number(sh.allotKg) || 0;
+  $("sAllot").textContent = allot + " kg"; $("sGot").textContent = got + " kg"; $("sWait").textContent = wait + " kg"; $("sRem").textContent = r2(allot - got - wait) + " kg";
+
+  const cur = mine.find(b => (b.months || []).includes(THIS));
+  $("thisMonth").textContent = !sh.shortlisted ? "You are not on the shortlist for this season yet, so sugar cannot be given."
+    : !cur ? THIS + ": no sugar has been billed for you yet. Ask the admin to allocate it."
+    : cur.status === "paid" ? THIS + ": your sugar is paid and given."
+    : THIS + ": your bill " + cur.billNo + " is ready. Pay the admin to receive your sugar.";
 
   // Festival sugar counts only from its date; before that it is listed as "Coming Soon".
   const soon = FES.filter(r => r.date > t).sort((a, b) => a.date.localeCompare(b.date));
   const items = [
+    ...BILLS.filter(b => b.status === "paid").flatMap(b => (b.months || []).map(m => ({ label: m, qty: Number(b.kgPerMonth), date: stamp(b), fest: false }))),
     ...REC.map(r => ({ label: r.month, qty: Number(r.quantity), date: r.date, fest: false })),
     ...FES.filter(r => r.date <= t).map(r => ({ label: r.festival + " (festival)", qty: Number(r.qty), date: r.date, fest: true }))
   ];
-  const asc = [...items].sort((a, b) => a.date.localeCompare(b.date));
-  let run = 0; const ledger = asc.map(r => ({ ...r, total: r2(run += r.qty) })).reverse();
+  let run = 0; const ledger = [...items].sort((a, b) => a.date.localeCompare(b.date)).map(r => ({ ...r, total: r2(run += r.qty) })).reverse();
   const cols = r => `<td>${esc(r.label)}</td><td style="color:${r.qty < 0 ? "#dc2626" : "inherit"}">${r.fest && r.qty > 0 ? "+" : ""}${r.qty} kg</td><td>${esc(r.date)}</td>`;
-  const paid = PAY.filter(p => p.status === "approved").reduce((a, p) => a + Number(p.amount), 0);
-
-  $("sTotal").textContent = r2(run) + " kg";
-  $("sShare").textContent = kg ? kg + " kg / month" : "-";
-  $("sList").textContent = sh.shortlisted ? "Shortlisted" + (sh.season ? " (" + sh.season + ")" : "") : "Not shortlisted";
-  $("sPaid").textContent = rs(paid);
-
-  const cur = PAY.find(p => p.month === THIS && p.status !== "rejected"), got = REC.some(r => r.month === THIS);
-  $("thisMonth").textContent = got ? THIS + ": your sugar has been given."
-    : !sh.shortlisted ? "You are not on the shortlist for this season yet, so sugar cannot be given."
-    : !cur ? THIS + ": pay in the Billing tab to receive your sugar."
-    : cur.status === "approved" ? THIS + ": payment confirmed. Your sugar will be given by the admin."
-    : THIS + ": payment sent. Waiting for the admin to confirm it.";
 
   $("soonCard").hidden = !soon.length;
   $("soon").innerHTML = soon.map(r => `<tr><td>${esc(r.festival)}</td><td style="color:${r.qty < 0 ? "#dc2626" : "inherit"}">${r.qty > 0 ? "+" : ""}${esc(r.qty)} kg</td><td>${esc(r.date)}</td></tr>`).join("");
-  $("recent").innerHTML = row([...ledger].slice(0, 5), cols, 3);
+  $("recent").innerHTML = row(ledger.slice(0, 5), cols, 3);
   $("all").innerHTML = row(ledger, r => cols(r) + `<td>${r.total} kg</td>`, 4);
 
-  // payment form
-  const free = MON.filter(m => !PAY.some(p => p.month === m.label && p.status !== "rejected"));
-  const keep = $("pMonth").value;
-  $("pMonth").innerHTML = free.length ? free.map(m => `<option>${m.label}</option>`).join("") : `<option value="">No month left to pay for</option>`;
-  if (free.some(m => m.label === keep)) $("pMonth").value = keep;
-  if (price && kg) { $("amt").value = r2(price * kg); $("amt").readOnly = true; $("amtHint").textContent = kg + " kg x \u20B9" + price + " per kg"; }
-  else { $("amt").readOnly = false; $("amtHint").textContent = ""; }
-  $("upiLine").textContent = PS?.upiId ? "Pay to UPI ID: " + PS.upiId : "";
-  $("qrImg").hidden = !PS?.qrImage; if (PS?.qrImage) $("qrImg").src = PS.qrImage;
-  $("noteLine").textContent = PS?.note || "";
-  $("noOnline").hidden = !!(PS?.upiId || PS?.qrImage);
-
-  $("pSub").textContent = rs(PAY.filter(p => p.status !== "rejected").reduce((a, p) => a + Number(p.amount), 0));
-  $("pApp").textContent = rs(paid);
-  $("pPend").textContent = PAY.filter(p => p.status === "pending").length;
-  const pays = [...PAY].sort((a, b) => (b.createdAt?.seconds || 9e9) - (a.createdAt?.seconds || 9e9));
-  $("pT").innerHTML = row(pays, p => `<td>${p.createdAt ? p.createdAt.toDate().toLocaleDateString() : ""}</td><td>${esc(p.month)}</td><td>${p.method === "cash" ? "Cash" : "Online"}</td><td>\u20B9${esc(p.amount)}</td><td>${esc(p.ref)}</td><td><span class="tag ${esc(p.status)}">${esc(p.status)}</span></td><td>${p.billNo ? `<button class="btn sm" data-view="${p.id}">View ${esc(p.billNo)}</button>` : "-"}</td>`, 7);
+  const list = [...BILLS].sort((a, b) => (b.createdAt?.seconds || 9e9) - (a.createdAt?.seconds || 9e9));
+  $("bT").innerHTML = row(list, b => `<td>${esc(stamp(b))}</td><td>${esc(b.billNo)}</td><td>${esc((b.months || []).join(", "))}</td><td>${esc(b.kg)} kg</td><td>\u20B9${esc(b.amount)}</td><td><span class="tag ${esc(b.status)}">${b.status === "unpaid" ? "not paid yet" : esc(b.status)}</span></td><td><button class="btn" data-view="${b.id}">View</button></td>`, 7);
 }
 
 // Each query is filtered by this user's uid, matching the Firestore rules.
 A.watchDoc("shareholders/" + me.shareholderId, d => { sh = d || {}; draw(); });
+A.watch("bills", l => { BILLS = l; draw(); }, me.uid);
 A.watch("records", l => { REC = l; draw(); }, me.uid);
 A.watch("festival", l => { FES = l; draw(); }, me.uid);
-A.watch("payments", l => { PAY = l; draw(); }, me.uid);
-A.watchDoc("settings/sugar", d => { SUGAR = d; draw(); });
-A.watchDoc("settings/payment", d => { PS = d; draw(); });
 
 document.addEventListener("click", e => {
   const id = e.target.dataset.view; if (!id) return;
-  const p = PAY.find(x => x.id === id);
-  if (p) A.showBill(p, { org: PS?.orgName, village: sh.village, mobile: sh.mobile });
+  const b = BILLS.find(x => x.id === id);
+  if (b) A.showBill(b, { village: sh.village, mobile: sh.mobile });
 });
-
-$("pF").onsubmit = async e => {
-  e.preventDefault();
-  const mo = MON.find(m => m.label === $("pMonth").value), online = $("pmOnline").checked;
-  if (!mo) return alert("There is no month left to pay for.");
-  if (online && !$("ref").value.trim()) return alert("Enter the UPI transaction ID after you pay.");
-  $("pBtn").disabled = true;
-  try {
-    await A.submitPayment({ uid: me.uid, shareholderId: me.shareholderId, name: me.name, method: online ? "online" : "cash", month: mo.label, monthKey: mo.key, amount: Number($("amt").value), ref: online ? $("ref").value.trim() : "Cash" });
-    $("ref").value = ""; alert(online ? "Payment submitted. The admin will confirm it." : "Cash payment noted. Give the cash to the admin to get it confirmed.");
-  } catch (x) { alert(x.message); }
-  $("pBtn").disabled = false;
-};
 </script>
 </body>
 </html>
