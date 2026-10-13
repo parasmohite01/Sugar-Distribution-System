@@ -1,6 +1,5 @@
 /* ===================================================================
    apis.js - the ONLY file that talks to Firebase.
-   >>> PASTE YOUR 4 FIREBASE VALUES BELOW (copy them from your old apis.js) <<<
    =================================================================== */
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged }
@@ -26,14 +25,6 @@ export const monthOptions = (from, count) => Array.from({ length: count }, (_, i
   const n = new Date(), d = new Date(n.getFullYear(), n.getMonth() + from + i, 1);
   return { key: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"), label: d.toLocaleString("en-US", { month: "long", year: "numeric" }) };
 });
-
-/* ---------- connection light (the element with id="conn" in each page) ---------- */
-const pill = (ok, msg) => {
-  const el = document.getElementById("conn"); if (!el) return;
-  el.hidden = false; el.className = "conn " + (ok ? "ok" : "bad");
-  el.textContent = ok ? "\u25CF Connected to Firestore" : "\u25CF Not connected: " + msg;
-};
-if (/^YOUR_/.test(firebaseConfig.apiKey)) pill(false, "apis.js still has the placeholder Firebase config");
 
 /* ---------- auth ---------- */
 export async function login(username, password) {
@@ -68,18 +59,17 @@ export const guard = role => new Promise(res => {
 });
 
 /* ---------- reads (live) ---------- */
-// A failed read turns the light red and shows a banner (id="dbErr") instead of failing silently.
+// A failed read shows a banner (id="dbErr") instead of failing silently.
 const fail = (what, e) => {
   console.error(what, e);
-  pill(false, what + " - " + (e.code || e.message));
   const b = document.getElementById("dbErr");
-  if (b) { b.hidden = false; b.textContent = "Could not load " + what + " (" + (e.code || e.message) + "). Publish the Firestore rules from the chat, then refresh."; }
+  if (b) { b.hidden = false; b.textContent = "Could not load " + what + " (" + (e.code || e.message) + "). Check the database rules, then refresh."; }
 };
 export const watch = (col, cb, uid) => onSnapshot(
   uid ? query(collection(db, col), where("uid", "==", uid)) : collection(db, col),
-  s => { pill(true); cb(s.docs.map(d => ({ id: d.id, ...d.data() }))); }, e => fail(col, e));
+  s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => fail(col, e));
 export const watchDoc = (path, cb) => onSnapshot(doc(db, ...path.split("/")),
-  s => { pill(true); cb(s.exists() ? s.data() : null); }, e => fail(path, e));
+  s => cb(s.exists() ? s.data() : null), e => fail(path, e));
 
 /* ---------- writes ---------- */
 // Firestore allows only 20 rule lookups per batch, so big jobs are saved in small groups.
@@ -115,7 +105,7 @@ export const removeShareholder = sh => {
   b.delete(doc(db, "shareholders", sh.id)); b.delete(doc(db, "users", sh.uid));
   return b.commit();
 };
-// Manual edit of a shareholder (details, season, cane, sugar, shortlist). Every edit is logged.
+// Manual edit of a shareholder (details, season, cane, shortlist). Every edit is logged.
 export const updateShareholder = (sh, data, changes) => {
   const b = writeBatch(db);
   b.update(doc(db, "shareholders", sh.id), data);
@@ -123,11 +113,11 @@ export const updateShareholder = (sh, data, changes) => {
   note(b, "edit", sh.id + " " + sh.name + " - " + changes);
   return b.commit();
 };
-// Factory list: hits = Map(shareholderId -> { tons, total, monthly }). Everyone else is taken off the shortlist.
+// Factory list: hits = Map(shareholderId -> { tons }). Everyone else is taken off the shortlist.
 export const applyShortlist = (season, hits, allIds) => commitAll([
   ...allIds.map(id => b => b.update(doc(db, "shareholders", id), hits.has(id)
-    ? { shortlisted: true, season, caneTons: hits.get(id).tons, allotKg: hits.get(id).total, monthlyKg: hits.get(id).monthly }
-    : { shortlisted: false, season, caneTons: 0, allotKg: 0, monthlyKg: 0 })),
+    ? { shortlisted: true, season, caneTons: hits.get(id).tons }
+    : { shortlisted: false, season, caneTons: 0 })),
   b => note(b, "list", "Factory list for " + season + ": " + hits.size + " shortlisted out of " + allIds.length)
 ]);
 
@@ -137,6 +127,21 @@ export const removeFestival = ids => commitAll(ids.map(id => b => b.delete(doc(d
 
 export const setStock = total => setDoc(doc(db, "settings", "stock"), { total });
 export const savePayment = data => setDoc(doc(db, "settings", "payment"), { ...data, updatedAt: serverTimestamp() });
+
+// Global declared values: sugar per shareholder per month (kg) and price per kg. Used by allocation and billing.
+export const saveGlobal = (monthlyKg, pricePerKg) => {
+  const b = writeBatch(db);
+  b.set(doc(db, "settings", "global"), { monthlyKg, pricePerKg, updatedAt: serverTimestamp() });
+  note(b, "global", "Declared sugar " + monthlyKg + " kg per month, price ₹" + pricePerKg + " per kg");
+  return b.commit();
+};
+
+/* ---------- monthly allocation ---------- */
+// One entitlement per shareholder per month. The id is fixed, so a month can never be given twice.
+export const allocateMonth = (month, list) => commitAll([
+  ...list.map(x => b => b.set(doc(db, "entitlements", month.key + "_" + x.shareholderId), { ...x, monthKey: month.key, month: month.label, createdAt: serverTimestamp() })),
+  b => note(b, "allocate", month.label + ": sugar allocated to " + list.length + " shareholder(s)")
+]);
 
 /* ---------- bills ---------- */
 export const createBill = async bill => {
@@ -177,9 +182,10 @@ export function showBill(b, info = {}) {
   const row = (a, v) => `<tr><td>${a}</td><td>${esc(v)}</td></tr>`;
   const when = (b.createdAt?.toDate ? b.createdAt.toDate() : new Date()).toLocaleDateString("en-IN");
   const st = b.status || "unpaid", label = st === "paid" ? "PAID" : st === "cancelled" ? "CANCELLED" : "NOT PAID YET";
+  const n = (b.months || []).length, same = b.kgPerMonth && b.kgPerMonth * n === b.kg;
   open(`<div class="sheet"><h2>${esc(b.org || "Sugar Distribution")}</h2><div class="sub">Sugar Bill</div>
 <div class="meta"><span>Bill No: <b>${esc(b.billNo)}</b></span><span>Date: ${when}</span></div>
-<table>${row("Shareholder", b.name)}${row("Shareholder ID", b.shareholderId)}${info.village ? row("Village", info.village) : ""}${info.mobile ? row("Mobile", info.mobile) : ""}${b.season ? row("Season", b.season) : ""}${row("Months", (b.months || []).join(", "))}${row("Sugar", b.kg + " kg (" + b.kgPerMonth + " kg x " + (b.months || []).length + ")")}${row("Rate", "₹" + b.rate + " per kg")}${row("Amount", "₹" + b.amount)}${st === "paid" ? row("Paid by", (b.method === "cash" ? "Cash" : "Online (UPI)") + (b.ref && b.method !== "cash" ? " - " + b.ref : "")) : ""}</table>
+<table>${row("Shareholder", b.name)}${row("Shareholder ID", b.shareholderId)}${info.village ? row("Village", info.village) : ""}${info.mobile ? row("Mobile", info.mobile) : ""}${b.season ? row("Season", b.season) : ""}${row("Months", (b.months || []).join(", "))}${row("Sugar", b.kg + " kg" + (same ? " (" + b.kgPerMonth + " kg x " + n + ")" : ""))}${row("Rate", "₹" + b.rate + " per kg")}${row("Amount", "₹" + b.amount)}${st === "paid" ? row("Paid by", (b.method === "cash" ? "Cash" : "Online (UPI)") + (b.ref && b.method !== "cash" ? " - " + b.ref : "")) : ""}</table>
 <div class="stamp ${st}">${label}</div>
 <div class="acts"><button onclick="window.print()">Print / Save as PDF</button>${closeBtn}</div></div>`);
 }
