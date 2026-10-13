@@ -9,10 +9,10 @@ import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, query, where,
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC0Vpi3jDeQViRie-y8LbUU8MAxAsNsjfg",
-  authDomain: "sugar-distribution-syste-c2ef3.firebaseapp.com",
-  projectId: "sugar-distribution-syste-c2ef3",
-  appId: "1:217317887183:web:27902b9d85894608d4fbba"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig), auth = getAuth(app), db = getFirestore(app);
@@ -21,11 +21,19 @@ const mail = u => u.trim().toLowerCase() + "@sugar-system.app";
 export const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-// Month list used by every page: [{ key: "2026-10", label: "October 2026" }, ...]
+// Month list used by the pages: [{ key: "2026-10", label: "October 2026" }, ...]
 export const monthOptions = (from, count) => Array.from({ length: count }, (_, i) => {
   const n = new Date(), d = new Date(n.getFullYear(), n.getMonth() + from + i, 1);
   return { key: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"), label: d.toLocaleString("en-US", { month: "long", year: "numeric" }) };
 });
+
+/* ---------- connection light (the element with id="conn" in each page) ---------- */
+const pill = (ok, msg) => {
+  const el = document.getElementById("conn"); if (!el) return;
+  el.hidden = false; el.className = "conn " + (ok ? "ok" : "bad");
+  el.textContent = ok ? "\u25CF Connected to Firestore" : "\u25CF Not connected: " + msg;
+};
+if (/^YOUR_/.test(firebaseConfig.apiKey)) pill(false, "apis.js still has the placeholder Firebase config");
 
 /* ---------- auth ---------- */
 export async function login(username, password) {
@@ -60,21 +68,22 @@ export const guard = role => new Promise(res => {
 });
 
 /* ---------- reads (live) ---------- */
-// A failed read shows a red banner (id="dbErr") instead of failing silently.
+// A failed read turns the light red and shows a banner (id="dbErr") instead of failing silently.
 const fail = (what, e) => {
   console.error(what, e);
+  pill(false, what + " - " + (e.code || e.message));
   const b = document.getElementById("dbErr");
-  if (b) { b.hidden = false; b.textContent = "Could not load " + what + " (" + (e.code || e.message) + "). Re-publish the Firestore rules, then refresh."; }
+  if (b) { b.hidden = false; b.textContent = "Could not load " + what + " (" + (e.code || e.message) + "). Publish the Firestore rules from the chat, then refresh."; }
 };
 export const watch = (col, cb, uid) => onSnapshot(
   uid ? query(collection(db, col), where("uid", "==", uid)) : collection(db, col),
-  s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => fail(col, e));
+  s => { pill(true); cb(s.docs.map(d => ({ id: d.id, ...d.data() }))); }, e => fail(col, e));
 export const watchDoc = (path, cb) => onSnapshot(doc(db, ...path.split("/")),
-  s => cb(s.exists() ? s.data() : null), e => fail(path, e));
+  s => { pill(true); cb(s.exists() ? s.data() : null); }, e => fail(path, e));
 
 /* ---------- writes ---------- */
 // Firestore allows only 20 rule lookups per batch, so big jobs are saved in small groups.
-const CH = 8;
+const CH = 6;
 const commitAll = async ops => {
   for (let i = 0; i < ops.length; i += CH) {
     const b = writeBatch(db);
@@ -82,6 +91,7 @@ const commitAll = async ops => {
     await b.commit();
   }
 };
+const note = (b, what, detail) => b.set(doc(collection(db, "log")), { what, detail, by: auth.currentUser?.uid || "", createdAt: serverTimestamp() });
 
 export async function addShareholder(sh, username, password) {
   const ref = doc(db, "shareholders", sh.id);
@@ -105,43 +115,39 @@ export const removeShareholder = sh => {
   b.delete(doc(db, "shareholders", sh.id)); b.delete(doc(db, "users", sh.uid));
   return b.commit();
 };
-export const updateShareholder = (sh, data) => {
+// Manual edit of a shareholder (details, season, cane, sugar, shortlist). Every edit is logged.
+export const updateShareholder = (sh, data, changes) => {
   const b = writeBatch(db);
   b.update(doc(db, "shareholders", sh.id), data);
   if (data.name) b.update(doc(db, "users", sh.uid), { name: data.name });
+  note(b, "edit", sh.id + " " + sh.name + " - " + changes);
   return b.commit();
 };
-// Factory list: hits = Map(shareholderId -> cane tons). Everyone else is taken off the shortlist.
-export const applyShortlist = (season, hits, allIds) => commitAll(allIds.map(id => b =>
-  b.update(doc(db, "shareholders", id), hits.has(id)
-    ? { shortlisted: true, season, caneTons: hits.get(id) }
-    : { shortlisted: false, season, caneTons: 0 })));
+// Factory list: hits = Map(shareholderId -> { tons, total, monthly }). Everyone else is taken off the shortlist.
+export const applyShortlist = (season, hits, allIds) => commitAll([
+  ...allIds.map(id => b => b.update(doc(db, "shareholders", id), hits.has(id)
+    ? { shortlisted: true, season, caneTons: hits.get(id).tons, allotKg: hits.get(id).total, monthlyKg: hits.get(id).monthly }
+    : { shortlisted: false, season, caneTons: 0, allotKg: 0, monthlyKg: 0 })),
+  b => note(b, "list", "Factory list for " + season + ": " + hits.size + " shortlisted out of " + allIds.length)
+]);
 
-// Monthly sugar: one record per shareholder per month (the id makes duplicates impossible).
-export const addRecords = list => commitAll(list.map(r => b =>
-  b.set(doc(db, "records", encodeURIComponent(r.shareholderId) + "_" + r.monthKey), { ...r, createdAt: serverTimestamp() })));
 export const addFestival = list => commitAll(list.map(x => b =>
   b.set(doc(collection(db, "festival")), { ...x, createdAt: serverTimestamp() })));
 export const removeFestival = ids => commitAll(ids.map(id => b => b.delete(doc(db, "festival", id))));
 
 export const setStock = total => setDoc(doc(db, "settings", "stock"), { total });
-export const setSugar = monthlyKg => setDoc(doc(db, "settings", "sugar"), { monthlyKg: Number(monthlyKg), updatedAt: serverTimestamp() });
 export const savePayment = data => setDoc(doc(db, "settings", "payment"), { ...data, updatedAt: serverTimestamp() });
 
-/* ---------- payments and bills ---------- */
-export const submitPayment = p => setDoc(doc(collection(db, "payments")), { ...p, status: "pending", createdAt: serverTimestamp() });
-export const addCashPayment = p => setDoc(doc(collection(db, "payments")), { ...p, status: "approved", createdAt: serverTimestamp() });
-export const setPaymentStatus = (id, status) => updateDoc(doc(db, "payments", id), { status });
-export const generateBill = (id, billNo, kg) => updateDoc(doc(db, "payments", id), { billNo, kg, billAt: serverTimestamp() });
+/* ---------- bills ---------- */
+export const createBill = async bill => {
+  const r = doc(collection(db, "bills"));
+  await setDoc(r, { ...bill, status: "unpaid", createdAt: serverTimestamp() });
+  return r.id;
+};
+export const markBillPaid = (id, method, ref) => updateDoc(doc(db, "bills", id), { status: "paid", method, ref, paidAt: serverTimestamp() });
+export const cancelBill = id => updateDoc(doc(db, "bills", id), { status: "cancelled" });
 
-// Printable bill shown over the page (Print button also lets you Save as PDF).
-export function showBill(p, info = {}) {
-  document.getElementById("billModal")?.remove();
-  const when = (p.billAt?.toDate ? p.billAt.toDate() : new Date()).toLocaleDateString("en-IN");
-  const row = (a, b) => `<tr><td>${a}</td><td>${esc(b)}</td></tr>`;
-  const m = document.createElement("div");
-  m.id = "billModal";
-  m.innerHTML = `<style>
+const sheetCss = `<style>
 #billModal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99;overflow:auto;padding:20px;font-family:Arial,Helvetica,sans-serif}
 #billModal .sheet{background:#fff;color:#111;max-width:560px;margin:0 auto;padding:28px;border-radius:10px}
 #billModal h2{text-align:center;margin-bottom:4px}
@@ -150,15 +156,39 @@ export function showBill(p, info = {}) {
 #billModal table{width:100%;border-collapse:collapse}
 #billModal td{padding:9px 6px;border-bottom:1px solid #ddd;font-size:14px}
 #billModal td:first-child{color:#555;width:42%}
-#billModal .paid{margin:18px 0;text-align:center;font-weight:bold;font-size:18px;color:#166534;border:2px solid #166534;padding:8px;border-radius:8px}
+#billModal .stamp{margin:18px 0;text-align:center;font-weight:bold;font-size:18px;padding:8px;border-radius:8px;border:2px solid}
+#billModal .paid{color:#166534}#billModal .unpaid{color:#92400e}#billModal .cancelled{color:#991b1b}
+#billModal .qr{display:block;margin:10px auto;max-width:300px;width:100%}
+#billModal .big{text-align:center;font-size:22px;font-weight:bold;margin:8px 0}
 #billModal .acts{display:flex;gap:10px;justify-content:center;margin-top:16px}
 #billModal button{padding:10px 16px;border:0;border-radius:7px;background:#2563eb;color:#fff;cursor:pointer}
 #billModal button.g{background:#6b7280}
 @media print{body>*:not(#billModal){display:none!important}#billModal{position:static;background:none;padding:0}#billModal .acts{display:none}}
-</style><div class="sheet"><h2>${esc(info.org || "Sugar Distribution")}</h2><div class="sub">Payment Bill</div>
-<div class="meta"><span>Bill No: <b>${esc(p.billNo || "-")}</b></span><span>Date: ${when}</span></div>
-<table>${row("Shareholder", p.name)}${row("Shareholder ID", p.shareholderId)}${info.village ? row("Village", info.village) : ""}${info.mobile ? row("Mobile", info.mobile) : ""}${row("Sugar for", p.month)}${p.kg ? row("Sugar quantity", p.kg + " kg") : ""}${row("Payment method", p.method === "cash" ? "Cash" : "Online (UPI)")}${p.method === "cash" ? "" : row("Reference", p.ref)}${row("Amount paid", "₹" + p.amount)}</table>
-<div class="paid">PAID</div>
-<div class="acts"><button onclick="window.print()">Print / Save as PDF</button><button class="g" onclick="document.getElementById('billModal').remove()">Close</button></div></div>`;
+</style>`;
+const open = html => {
+  document.getElementById("billModal")?.remove();
+  const m = document.createElement("div"); m.id = "billModal"; m.innerHTML = sheetCss + html;
   document.body.appendChild(m);
+};
+const closeBtn = `<button class="g" onclick="document.getElementById('billModal').remove()">Close</button>`;
+
+// Printable bill (Print button also lets you Save as PDF).
+export function showBill(b, info = {}) {
+  const row = (a, v) => `<tr><td>${a}</td><td>${esc(v)}</td></tr>`;
+  const when = (b.createdAt?.toDate ? b.createdAt.toDate() : new Date()).toLocaleDateString("en-IN");
+  const st = b.status || "unpaid", label = st === "paid" ? "PAID" : st === "cancelled" ? "CANCELLED" : "NOT PAID YET";
+  open(`<div class="sheet"><h2>${esc(b.org || "Sugar Distribution")}</h2><div class="sub">Sugar Bill</div>
+<div class="meta"><span>Bill No: <b>${esc(b.billNo)}</b></span><span>Date: ${when}</span></div>
+<table>${row("Shareholder", b.name)}${row("Shareholder ID", b.shareholderId)}${info.village ? row("Village", info.village) : ""}${info.mobile ? row("Mobile", info.mobile) : ""}${b.season ? row("Season", b.season) : ""}${row("Months", (b.months || []).join(", "))}${row("Sugar", b.kg + " kg (" + b.kgPerMonth + " kg x " + (b.months || []).length + ")")}${row("Rate", "₹" + b.rate + " per kg")}${row("Amount", "₹" + b.amount)}${st === "paid" ? row("Paid by", (b.method === "cash" ? "Cash" : "Online (UPI)") + (b.ref && b.method !== "cash" ? " - " + b.ref : "")) : ""}</table>
+<div class="stamp ${st}">${label}</div>
+<div class="acts"><button onclick="window.print()">Print / Save as PDF</button>${closeBtn}</div></div>`);
+}
+
+// Full-screen QR for the admin to show the shareholder.
+export function showQr(b, ps = {}) {
+  open(`<div class="sheet"><h2>${esc(ps.orgName || b.org || "Sugar Distribution")}</h2><div class="sub">Scan to pay - Bill ${esc(b.billNo)}</div>
+<div class="big">₹${esc(b.amount)}</div>
+${ps.qrImage ? `<img class="qr" src="${ps.qrImage}" alt="Payment QR">` : `<p style="text-align:center;color:#991b1b;margin:14px 0">No QR photo saved yet. Add it in Billing.</p>`}
+${ps.upiId ? `<p style="text-align:center">UPI ID: <b>${esc(ps.upiId)}</b></p>` : ""}${ps.note ? `<p style="text-align:center;color:#555;margin-top:6px">${esc(ps.note)}</p>` : ""}
+<div class="acts">${closeBtn}</div></div>`);
 }
