@@ -108,7 +108,8 @@ function draw() {
 
   const got = sumK(mine.filter(b => b.status === "paid")), wait = sumK(mine.filter(b => b.status === "unpaid")), allot = r2(ENT.reduce((a, e) => a + Number(e.kg || 0), 0)), remKg = r2(pend.reduce((a, e) => a + Number(e.kg || 0), 0));
   $("sAllot").textContent = allot + " kg"; $("sGot").textContent = got + " kg"; $("sWait").textContent = wait + " kg"; $("sRem").textContent = remKg + " kg";
-  $("pend").innerHTML = row(pend, e => `<td>${esc(e.month)}</td><td>${esc(e.kg)} kg</td>`, 2);
+  const fOf = e => FES.filter(r => String(r.date).slice(0, 7) === e.monthKey && r.date <= t).reduce((a, r) => a + Number(r.qty || 0), 0);
+  $("pend").innerHTML = row(pend, e => `<td>${esc(e.month)}</td><td>${esc(e.kg)} kg${fOf(e) ? ` <span style="color:#16a34a">${fOf(e) > 0 ? "+ " : "- "}${Math.abs(r2(fOf(e)))} kg festival (free)</span>` : ""}</td>`, 2);
   $("declared").textContent = GS.monthlyKg ? "Declared sugar: " + GS.monthlyKg + " kg per month" + (GS.pricePerKg ? " at \u20B9" + GS.pricePerKg + " per kg." : ".") : "The monthly sugar and price have not been declared yet.";
 
   const cur = mine.find(b => (b.monthKeys || []).includes(THISKEY) || (b.months || []).includes(THIS)), ent = ENT.find(e => e.monthKey === THISKEY);
