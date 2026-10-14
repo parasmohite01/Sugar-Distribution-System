@@ -150,13 +150,14 @@ input[type=checkbox],input[type=radio],.pick input{width:18px;height:18px;paddin
   <section id="dist">
     <div class="card"><h3>Distribution and Bill</h3>
       <form id="dF">
-        <div class="fg"><label for="dWho">Shortlisted shareholder</label><select id="dWho"></select></div>
+        <div class="fg"><label for="dSearch">Search by name or ID</label><input id="dSearch" placeholder="Type a name or shareholder ID..." autocomplete="off"></div>
+        <div class="fg" style="margin-top:12px"><label for="dWho">Shortlisted shareholder</label><select id="dWho"></select></div>
         <div class="info" id="dInfo"></div>
         <label style="font-weight:600;font-size:14px">Remaining months (allocated, not billed yet). Tick the months to give now.</label>
         <div class="chips" id="dMonths"></div>
         <div class="head" style="margin:14px 0 0"><b id="dSum"></b><button class="btn">Generate bill</button></div>
       </form></div>
-    <div class="card"><h3>Sugar Left for Each Shareholder</h3>
+    <div class="card"><h3>Sugar Left for Each Shareholder <span class="hint" style="font-weight:400">(follows the search above)</span></h3>
       <div class="wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Allocated</th><th>Paid</th><th>Billed, not paid</th><th>Remaining</th><th>Months left</th><th></th></tr></thead><tbody id="sT"></tbody></table></div></div>
     <div class="card"><h3>Distribution History and Remaining Stock</h3>
       <div class="wrap"><table><thead><tr><th>Date</th><th>For</th><th>Shareholders</th><th>Sugar given</th><th>Stock left after</th></tr></thead><tbody id="hT"></tbody></table></div></div>
@@ -250,6 +251,10 @@ const reserved = () => sum(BILLS.filter(b => b.status === "unpaid"), b => b.kg);
 const left = () => r2(stock - given() - reserved());
 const name = id => (SH.find(s => s.id === id) || {}).name || id;
 const FS = () => SH.filter(s => s.shortlisted);
+// Festival sugar given free in a month (only festivals whose date has come). Not billed.
+const festOf = (id, key) => FES.filter(r => r.shareholderId === id && String(r.date).slice(0, 7) === key && due(r));
+const festKg = (id, key) => sum(festOf(id, key), r => r.qty);
+const festTxt = (id, key) => festOf(id, key).map(r => (r.qty > 0 ? "+" : "") + r.qty + " kg " + r.festival).join(", ");
 const signed = (q, plus) => (plus && q > 0 ? "+" : "") + q + " kg";
 const tb = (id, list, fn, n) => $(id).innerHTML = list.length ? list.map(fn).join("") : `<tr><td colspan="${n}" class="empty">Nothing here yet.</td></tr>`;
 const safe = fn => async e => { e.preventDefault(); try { await fn(e); } catch (x) { alert(x.message); } };
@@ -364,13 +369,13 @@ $("alF").onsubmit = safe(async () => {
 /* ---------- distribution and bills ---------- */
 function drawDist() {
   const s = SH.find(x => x.id === $("dWho").value);
-  if (!s) { $("dInfo").textContent = "No shortlisted shareholder yet. Upload the factory list in Update Users first."; $("dMonths").innerHTML = ""; $("dSum").textContent = ""; return; }
+  if (!s) { $("dInfo").textContent = $("dSearch").value.trim() ? "No shortlisted shareholder matches your search." : "No shortlisted shareholder yet. Upload the factory list in Update Users first."; $("dMonths").innerHTML = ""; $("dSum").textContent = ""; return; }
   const pend = pending(s.id);
   $("dInfo").innerHTML = `Season ${esc(s.season || "-")} &nbsp;|&nbsp; Paid ${kgPaid(s.id)} kg &nbsp;|&nbsp; Billed, not paid ${kgUnpaid(s.id)} kg &nbsp;|&nbsp; <b>Remaining ${pend.length} month(s) = ${pendKg(s.id)} kg</b>`;
-  $("dMonths").innerHTML = pend.length ? pend.map(e => `<label class="chip"><input type="checkbox" data-mo="${esc(e.monthKey)}" ${mSel.has(e.monthKey) ? "checked" : ""}>${esc(e.month)} - ${e.kg} kg</label>`).join("")
+  $("dMonths").innerHTML = pend.length ? pend.map(e => `<label class="chip"><input type="checkbox" data-mo="${esc(e.monthKey)}" ${mSel.has(e.monthKey) ? "checked" : ""}><span>${esc(e.month)} - <b>${e.kg} kg</b>${festOf(s.id, e.monthKey).length ? ` <span style="color:#16a34a">${festKg(s.id, e.monthKey) > 0 ? "+ " : "- "}${Math.abs(festKg(s.id, e.monthKey))} kg festival (free)</span><br><small style="color:#6b7280">${esc(festTxt(s.id, e.monthKey))}</small>` : ""}</span></label>`).join("")
     : `<div class="empty" style="grid-column:1/-1">No remaining months. Allocate a month in Allocation first, or all allocated months are already billed.</div>`;
-  const chosen = pend.filter(e => mSel.has(e.monthKey)), kg = sum(chosen, e => e.kg);
-  $("dSum").textContent = chosen.length + " month(s) = " + kg + " kg  |  " + (rate() ? "bill ₹" + r2(kg * rate()) + " at ₹" + rate() + " per kg" : "declare the price per kg on the Dashboard first");
+  const chosen = pend.filter(e => mSel.has(e.monthKey)), kg = sum(chosen, e => e.kg), bonus = sum(chosen, e => festKg(s.id, e.monthKey));
+  $("dSum").textContent = chosen.length + " month(s) = " + kg + " kg" + (bonus ? " + " + bonus + " kg festival (free) = " + r2(kg + bonus) + " kg to hand over" : "") + "  |  " + (rate() ? "bill only " + kg + " kg: " : "") + (rate() ? "bill ₹" + r2(kg * rate()) + " at ₹" + rate() + " per kg" : "declare the price per kg on the Dashboard first");
 }
 function history() {
   const g = {};
@@ -389,12 +394,13 @@ $("dF").onsubmit = safe(async () => {
   if (!chosen.length) throw Error("Tick at least one month.");
   const kg = sum(chosen, e => e.kg);
   if (kg > left()) throw Error("Only " + left() + " kg is left in stock but this needs " + kg + " kg. Update the total stock on the Dashboard first.");
+  const bonus = sum(chosen, e => festKg(s.id, e.monthKey)), bonusNote = chosen.flatMap(e => festOf(s.id, e.monthKey).map(r => r.festival + " " + (r.qty > 0 ? "+" : "") + r.qty + " kg")).join(", ");
   const billNo = nextBill(), same = chosen.every(e => Number(e.kg) === Number(chosen[0].kg));
   await A.createBill({ billNo, org: PS?.orgName || "Sugar Distribution", shareholderId: s.id, uid: s.uid, name: s.name, season: s.season || "",
     months: chosen.map(e => e.month), monthKeys: chosen.map(e => e.monthKey), items: chosen.map(e => ({ month: e.month, key: e.monthKey, kg: Number(e.kg) })),
-    kgPerMonth: same ? Number(chosen[0].kg) : 0, kg, rate: rate(), amount: r2(kg * rate()) });
+    kgPerMonth: same ? Number(chosen[0].kg) : 0, kg, bonusKg: bonus, bonusNote, rate: rate(), amount: r2(kg * rate()) });
   mSel.clear(); show("bill");
-  alert("Bill " + billNo + " created for " + s.name + ": " + kg + " kg, ₹" + r2(kg * rate()) + ". Use Show QR to collect payment, then Mark paid.");
+  alert("Bill " + billNo + " created for " + s.name + ": " + kg + " kg billed, ₹" + r2(kg * rate()) + (bonus ? " (plus " + bonus + " kg festival sugar, free)" : "") + ". Use Show QR to collect payment, then Mark paid.");
 });
 
 /* ---------- festival ---------- */
@@ -429,17 +435,18 @@ function draw() {
 
   drawAlloc();
 
+  const q = $("dSearch").value.trim().toLowerCase(), DL = FS().filter(s => !q || String(s.id).toLowerCase().includes(q) || String(s.name || "").toLowerCase().includes(q));
   const keep = $("dWho").value;
-  $("dWho").innerHTML = FS().map(s => `<option value="${esc(s.id)}">${esc(s.id)} - ${esc(s.name)}</option>`).join("");
-  if (FS().some(s => s.id === keep)) $("dWho").value = keep;
+  $("dWho").innerHTML = DL.map(s => `<option value="${esc(s.id)}">${esc(s.id)} - ${esc(s.name)}</option>`).join("");
+  if (DL.some(s => s.id === keep)) $("dWho").value = keep; else mSel.clear();
   drawDist();
-  tb("sT", FS(), s => { const p = pending(s.id);
+  tb("sT", DL, s => { const p = pending(s.id);
     return `<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${kgAlloc(s.id)} kg</td><td>${kgPaid(s.id)} kg</td><td>${kgUnpaid(s.id)} kg</td><td><b>${pendKg(s.id)} kg</b></td><td>${p.length}</td><td><button class="btn sm" data-dist="${esc(s.id)}">Distribute</button></td></tr>`; }, 8);
   tb("hT", history(), h => `<tr><td>${esc(h.date)}</td><td>${esc(h.what)}</td><td>${h.n}</td><td>${h.kg} kg</td><td>${h.left} kg</td></tr>`, 5);
 
   const pf = $("pSearch").value.toLowerCase();
   tb("pT", [...BILLS].sort(newest).filter(b => [b.billNo, b.name, b.shareholderId, (b.months || []).join(" "), b.status].join(" ").toLowerCase().includes(pf)),
-    b => `<tr><td>${esc(stamp(b))}</td><td>${esc(b.billNo)}</td><td>${esc(b.name)} (${esc(b.shareholderId)})</td><td>${esc((b.months || []).join(", "))}</td><td>${esc(b.kg)} kg</td><td>₹${esc(b.amount)}</td><td><span class="tag ${esc(b.status)}">${esc(b.status)}</span></td><td>${
+    b => `<tr><td>${esc(stamp(b))}</td><td>${esc(b.billNo)}</td><td>${esc(b.name)} (${esc(b.shareholderId)})</td><td>${esc((b.months || []).join(", "))}</td><td>${esc(b.kg)} kg${b.bonusKg ? ` <small style="color:#16a34a">+ ${esc(b.bonusKg)} kg festival (free)</small>` : ""}</td><td>₹${esc(b.amount)}</td><td><span class="tag ${esc(b.status)}">${esc(b.status)}</span></td><td>${
       b.status === "unpaid" ? `<button class="btn sm" data-qr="${b.id}">Show QR</button> <button class="btn green sm" data-paid="${b.id}">Mark paid</button> <button class="btn gray sm" data-view="${b.id}">View</button> <button class="btn red sm" data-cbill="${b.id}">Cancel</button>`
       : b.status === "paid" ? `<button class="btn gray sm" data-view="${b.id}">View bill</button>` : ""}</td></tr>`, 8);
 
@@ -459,7 +466,7 @@ function draw() {
   ].sort((a, b) => b.date.localeCompare(a.date)).filter(r => [r.id, name(r.id), r.type, r.what, r.date, r.st].join(" ").toLowerCase().includes(rf));
   tb("rT", rows, r => `<tr><td>${esc(r.id)} - ${esc(name(r.id))}</td><td>${esc(r.type)}</td><td>${esc(r.what)}</td><td style="color:${r.qty < 0 ? "#dc2626" : "inherit"}">${signed(r.qty, r.type === "Festival")}</td><td>${esc(r.date)}</td><td><span class="tag ${r.cls}">${r.st}</span></td></tr>`, 6);
 }
-["shSearch", "uSearch", "pSearch", "rSearch"].forEach(i => $(i).oninput = draw);
+["shSearch", "uSearch", "pSearch", "rSearch", "dSearch"].forEach(i => $(i).oninput = draw);
 
 /* ---------- live data ---------- */
 A.watch("shareholders", l => { SH = l.sort((a, b) => a.id.localeCompare(b.id)); draw(); });
@@ -535,7 +542,7 @@ document.addEventListener("click", async e => {
     if (d.del && confirm("Delete this shareholder? Their login stops working; past records are kept.")) await A.removeShareholder(SH.find(s => s.id === d.del));
     if (d.edit) { show("upd"); openEdit(SH.find(s => s.id === d.edit)); }
     if (d.hist) openHist(d.hist);
-    if (d.dist) { show("dist"); $("dWho").value = d.dist; mSel.clear(); drawDist(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    if (d.dist) { show("dist"); $("dSearch").value = ""; draw(); $("dWho").value = d.dist; mSel.clear(); drawDist(); window.scrollTo({ top: 0, behavior: "smooth" }); }
     if (d.qr) A.showQr(BILLS.find(b => b.id === d.qr), PS || {});
     if (d.paid) { const b = BILLS.find(x => x.id === d.paid); payTarget = d.paid; $("pmTitle").textContent = "Mark " + b.billNo + " as paid"; $("pmSub").textContent = b.name + " - ₹" + b.amount + " for " + (b.months || []).join(", "); $("mRef").value = ""; $("mOnline").checked = true; $("payModal").hidden = false; }
     if (d.view) viewBill(BILLS.find(b => b.id === d.view));
